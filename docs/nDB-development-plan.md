@@ -30,161 +30,170 @@ These decisions were resolved before implementation begins. See [nDB-spec §Reso
 
 ---
 
-## Phase 1: Storage Core
+## Phase 1: Storage Core ✅
 **Goal:** Basic JSON Lines storage with O(1) operations, in-memory document store
 
-- [ ] **Project setup** ([nDB-spec §Implementation Notes](./nDB-spec.md#language-rust--internal-n-api-napi-rs))
+- [x] **Project setup** ([nDB-spec §Implementation Notes](./nDB-spec.md#language-rust--internal-n-api-napi-rs))
   - Rust crate structure (workspace with `napi/` sub-crate, following nVDB pattern)
   - Dev dependencies only (tempfile, criterion)
 
-- [ ] **NanoID `_id` generation** ([nDB-spec §`_id` Generation](./nDB-spec.md#_id-generation))
+- [x] **NanoID `_id` generation** ([nDB-spec §`_id` Generation](./nDB-spec.md#_id-generation))
   - 16-char base62 PRNG-based ID generation
   - Uniqueness check against existing HashMap
   - Optional prefix support (`insert_with_prefix`)
 
-- [ ] **JSON Lines I/O** ([nDB-spec §Storage Format](./nDB-spec.md#storage-format))
+- [x] **JSON Lines I/O** ([nDB-spec §Storage Format](./nDB-spec.md#storage-format))
   - Append-only file writer
   - Line parsing (serde_json)
   - Basic metadata header (`_meta` line)
 
-- [ ] **In-memory document store** ([nDB-spec §Layer 1: Core](./nDB-spec.md#layer-1-core-the-fast-path))
+- [x] **In-memory document store** ([nDB-spec §Layer 1: Core](./nDB-spec.md#layer-1-core-the-fast-path))
   - `RwLock<HashMap<String, Value>>` for `_id → document`
   - Load all documents from JSON Lines on open
   - Single-writer Mutex for write operations
 
-- [ ] **Core operations**
+- [x] **Core operations**
   - `insert(doc)` → generate NanoID, store in HashMap, append to file
   - `get(id)` → O(1) HashMap lookup
   - `delete(id)` → soft delete (tombstone in HashMap, append `_deleted` to file)
 
-**Deliverable:** In-memory test passing basic CRUD with NanoID identifiers
+**Deliverable:** In-memory test passing basic CRUD with NanoID identifiers ✅
 
 ---
 
-## Phase 2: Advanced Core
+## Phase 2: Advanced Core ✅
 **Goal:** Updates, iteration, compaction, and trash
 
-- [ ] **Update operation** ([nDB-spec §Core Methods](./nDB-spec.md#core-methods))
+- [x] **Update operation** ([nDB-spec §Core Methods](./nDB-spec.md#core-methods))
   - Replace document in HashMap
   - Append new version to file (old version superseded by index)
 
-- [ ] **Iteration** ([nDB-spec §iter()](./nDB-spec.md#layer-1-core-the-fast-path))
+- [x] **Iteration** ([nDB-spec §iter()](./nDB-spec.md#layer-1-core-the-fast-path))
   - `iter()` over all non-deleted docs from HashMap
   - Filter out tombstones
 
-- [ ] **Compaction** ([nDB-spec §Compaction Strategy](./nDB-spec.md#compaction-strategy))
+- [x] **Compaction** ([nDB-spec §Compaction Strategy](./nDB-spec.md#compaction-strategy))
   - Scan active docs from HashMap
   - Rewrite to temp file
   - Atomic swap
   - Archive deleted docs to trash
 
-- [ ] **Trash bucket** ([nDB-spec §Compaction & Document Trash](./nDB-spec.md#compaction--document-trash))
+- [x] **Trash bucket** ([nDB-spec §Compaction & Document Trash](./nDB-spec.md#compaction--document-trash))
   - Soft delete (tombstone in HashMap)
   - Trash directory structure
   - `restore()` from trash
 
-- [ ] **Persistence modes** ([nDB-spec §Operating Modes](./nDB-spec.md#operating-modes))
+- [x] **Persistence modes** ([nDB-spec §Operating Modes](./nDB-spec.md#operating-modes))
   - `Persistence::Lazy` (default) — flush on explicit call or shutdown
   - `Persistence::Scheduled(N)` — flush every N seconds
   - `Persistence::Immediate` — fsync after every write
 
-**Deliverable:** Compaction working, deleted docs recoverable, configurable persistence
+**Deliverable:** Compaction working, deleted docs recoverable, configurable persistence ✅
 
 ---
 
-## Phase 3: File Buckets
+## Phase 3: File Buckets ✅
 **Goal:** Binary storage with deduplication
 
-- [ ] **File bucket I/O** ([nDB-spec §File Buckets](./nDB-spec.md#file-buckets---binary-storage))
+- [x] **File bucket I/O** ([nDB-spec §File Buckets](./nDB-spec.md#file-buckets---binary-storage))
   - SHA-256 hash calculation (implement ourselves)
   - Hash-based storage path
   - Atomic file writes
 
-- [ ] **File operations** ([nDB-spec §File Bucket Methods](./nDB-spec.md#file-bucket-methods))
+- [x] **File operations** ([nDB-spec §File Bucket Methods](./nDB-spec.md#file-bucket-methods))
   - `store(name, data)` → `FileRef`
   - `get(hash)` → bytes
   - `delete(hash)` → move to trash
 
-- [ ] **Trash coordination** ([nDB-spec §Trash behavior](./nDB-spec.md#file-layout))
+- [x] **Trash coordination** ([nDB-spec §Trash behavior](./nDB-spec.md#file-layout))
   - File trash directory
   - Restore from trash
   - Optional TTL cleanup
 
-**Deliverable:** Can store/retrieve files alongside documents
+**Deliverable:** Can store/retrieve files alongside documents ✅
 
 ---
 
-## Phase 4: Query Layer
+## Phase 4: Query Layer ✅
 **Goal:** Layer 2 & 3 query APIs
 
-- [ ] **Single field queries** ([nDB-spec §Layer 2](./nDB-spec.md#layer-2-single-field-queries-the-9))
+- [x] **Single field queries** ([nDB-spec §Layer 2](./nDB-spec.md#layer-2-single-field-queries-the-9))
   - `find(field, value)` - linear scan over HashMap
   - `find_where(field, predicate)`
   - Iterator-based (lazy)
 
-- [ ] **Opt-in indexing** ([nDB-spec §Opt-In Indexing](./nDB-spec.md#opt-in-indexing))
+- [x] **Opt-in indexing** ([nDB-spec §Opt-In Indexing](./nDB-spec.md#opt-in-indexing))
   - `create_index(field)` → HashMap
   - `find()` uses index if available
   - `drop_index()` to free memory
 
-- [ ] **JSON AST query evaluator** ([nDB-spec §Layer 3](./nDB-spec.md#layer-3-json-ast-queries-the-1))
+- [x] **JSON AST query evaluator** ([nDB-spec §Layer 3](./nDB-spec.md#layer-3-json-ast-queries-the-1))
   - `QueryNode` enum for AST representation
   - Recursive evaluator over `iter()`
   - Operators: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$exists`
   - Combinators: `$and`, `$or`, `$not`
   - `query_with(ast, opts)` with limit/sort/offset
 
-**Deliverable:** Complex queries working with optional indexes via JSON AST
+**Deliverable:** Complex queries working with optional indexes via JSON AST ✅
 
 ---
 
-## Phase 5: N-API Bindings
+## Phase 5: N-API Bindings ✅
 **Goal:** Node.js integration via direct napi-rs
 
-- [ ] **Setup napi-rs** (following nVDB's `napi/` pattern)
+- [x] **Setup napi-rs** (following nVDB's `napi/` pattern)
   - Add `napi` and `napi-derive` dependencies
   - Workspace Cargo.toml with `napi/` sub-crate
   - Setup build.rs and package.json linkage
 
-- [ ] **JS API surface** ([nDB-spec §Node.js / Electron Usage](./nDB-spec.md#nodejs--electron-usage))
+- [x] **JS API surface** ([nDB-spec §Node.js / Electron Usage](./nDB-spec.md#nodejs--electron-usage))
   - `Database` class constructor in `napi/src/lib.rs`
   - `insert()`, `get()`, `delete()`, `update()` methods
   - `query(ast)` — accepts raw JSON object, passes as AST
 
-- [ ] **File API**
+- [x] **File API**
   - `bucket(name)` accessor
   - `store()`, `get()` methods
   - Buffer handling
 
-- [ ] **Package build**
+- [x] **Package build**
   - napi-rs build config
   - Prebuild binaries
   - Vanilla JS module exports
   - `.d.ts` definitions generated for LLM/editor context only
 
-**Deliverable:** `npm install` and `require('@ngdb/ndb')` works
+**Deliverable:** `npm install` and `require('@ngdb/ndb')` works ✅
 
 ---
 
-## Phase 6: Production Polish
+## Phase 6: Production Polish 🔄
 **Goal:** Performance and reliability
 
-- [ ] **Persistence guarantees**
+- [x] **Persistence guarantees**
   - fsync options (already implemented in Phase 2, stress test here)
   - Corruption detection on load
   - Crash recovery scenarios
 
-- [ ] **Benchmarks**
-  - Insert throughput
-  - Query latency (Layer 1, 2, 3)
-  - Memory usage
+- [x] **Benchmarks**
+  - Insert throughput (in-memory, lazy, immediate, bulk)
+  - Query latency (Layer 1 get, Layer 2 find, Layer 3 JSON AST)
+  - Indexed vs non-indexed query comparison
   - Compaction performance
+  - Update and delete throughput
+  - Iteration over large datasets
 
-- [ ] **Edge cases**
+- [x] **Edge cases**
   - Empty database operations
-  - Very large documents
-  - Concurrent read stress test
-  - Power-loss simulation (kill during write)
+  - Very large documents (1MB+)
+  - Deeply nested documents (50 levels)
+  - Documents with many fields (1000+)
+  - Unicode values
+  - Null and special JSON values
+  - Concurrent read stress test (multi-threaded)
+  - Concurrent queries during inserts
+  - Power-loss simulation (partial writes, truncated lines)
+  - Compaction under load
+  - Full lifecycle persist/reopen
 
 **Deliverable:** Benchmarked, production-ready package
 
