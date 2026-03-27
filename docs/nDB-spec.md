@@ -1,7 +1,7 @@
 # nDB Design Document
 
 > n000b's Document Database - Human-readable storage for the AI age.
-> Part of the nGDB platform ecosystem.
+> Standalone embeddable database for Node.js and Rust applications.
 
 ## Ecosystem Overview
 
@@ -15,11 +15,11 @@ Development Workspace (nGDB)
 ├── ndb/                       ← git submodule (this project)
 │   ├── src/                   ← Rust core
 │   ├── napi/                  ← N-API bindings (napi-rs, internal)
-│   └── package.json           ← Published as @ngdb/ndb
+│   └── package.json           ← Published as ndb
 ├── nvdb/                      ← git submodule (vector DB)
 │   ├── src/                   ← Rust core
 │   ├── napi/                  ← N-API bindings (napi-rs, internal)
-│   └── package.json           ← Published as @ngdb/nvdb
+│   └── package.json           ← Published as nvdb
 └── tests/                     ← Integration tests
 
 Standalone Repositories
@@ -32,7 +32,7 @@ Standalone Repositories
 1. **Develop in nGDB workspace** - All modules together with submodules
 2. **Test integration** - End-to-end tests across nDB + nVDB + nGDB service
 3. **Publish packages** - Stable modules published to npm independently
-4. **Standalone use** - Apps can `npm install @ngdb/ndb` without nGDB
+4. **Standalone use** - Apps can `npm install ndb` without nGDB
 
 ### Runtime Architecture
 
@@ -68,7 +68,7 @@ Standalone Repositories
 **Key insight:** nGDB provides a **unified API surface** regardless of which backend serves the data. Clients don't care if a collection is stored in nDB (JSON) or nVDB (vectors) - the API stays the same.
 
 **Architecture Note:** nDB and nVDB are standalone packages, each implementing N-API bindings internally using napi-rs directly (no shared bridge module). This allows:
-- Independent npm packages: `npm install @ngdb/ndb` or `npm install @ngdb/nvdb`
+- Independent npm packages: `npm install ndb` or `npm install nvdb`
 - Both work standalone in Node.js/Electron projects
 - Perfect coupling between each backend's specific needs and its JS interface
 - Each package owns its binding code, optimized for its own API surface
@@ -405,15 +405,15 @@ nDB is a self-contained npm package with internal N-API bindings via napi-rs.
 ### Installation
 
 ```bash
-npm install @ngdb/ndb
+npm install ndb
 # or
-yarn add @ngdb/ndb
+yarn add ndb
 ```
 
 ### Basic Usage
 
 ```javascript
-const { Database } = require('@ngdb/ndb');
+const { Database } = require('ndb');
 
 // Open or create database
 const db = Database.open('./my-data');
@@ -454,8 +454,8 @@ db.insert({
 ### Using with nVDB (separate package)
 
 ```javascript
-const { Database: nDB } = require('@ngdb/ndb');
-const { Database: nVDB } = require('@ngdb/nvdb');
+const { Database: nDB } = require('ndb');
+const { Database: nVDB } = require('nvdb');
 
 // Document database
 const docs = nDB.open('./documents');
@@ -473,7 +473,7 @@ nDB works in both Electron main and renderer processes:
 
 ```javascript
 // Main process
-const { Database } = require('@ngdb/ndb');
+const { Database } = require('ndb');
 const db = Database.open(app.getPath('userData') + '/db');
 
 // IPC to renderer
@@ -792,7 +792,7 @@ nGDB/                          ← Main development workspace
 Once stable, nDB and nVDB are published as standalone packages:
 ```bash
 # Standalone use (after initial development)
-npm install @ngdb/ndb   # or @ngdb/nvdb
+npm install ndb   # or nvdb
 ```
 
 ### Core Data Structures

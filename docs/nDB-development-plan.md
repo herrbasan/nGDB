@@ -162,11 +162,11 @@ These decisions were resolved before implementation begins. See [nDB-spec §Reso
   - Vanilla JS module exports
   - `.d.ts` definitions generated for LLM/editor context only
 
-**Deliverable:** `npm install` and `require('@ngdb/ndb')` works ✅
+**Deliverable:** `npm install` and `require('ndb')` works ✅
 
 ---
 
-## Phase 6: Production Polish 🔄
+## Phase 6: Production Polish ✅
 **Goal:** Performance and reliability
 
 - [x] **Persistence guarantees**

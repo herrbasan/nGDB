@@ -24,7 +24,7 @@
   - Docker compose for local dev
 
 - [ ] **nDB integration** ([nGDB-spec §Backend Registration](./nGDB-spec.md#backend-registration))
-  - Import `@ngdb/ndb` from local submodule
+  - Import `ndb` from local submodule
   - Basic database lifecycle (open/close)
   - Health check endpoint
 

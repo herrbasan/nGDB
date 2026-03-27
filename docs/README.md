@@ -46,8 +46,8 @@ Clients (Web, Mobile, MCP Agents)
            │ uses npm packages
            ▼
     ┌──────────────────┐
-    │  @ngdb/ndb       │
-    │  @ngdb/nvdb      │
+    │  ndb             │
+    │  nvdb            │
     └──────────────────┘
            │
     ┌──────┴──────┐

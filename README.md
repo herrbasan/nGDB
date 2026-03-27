@@ -31,7 +31,7 @@ nGDB is not a single database—it's a **database platform**. Instead of forcing
                               │
                               ▼ uses npm packages
 ┌─────────────────────────────────────────────────────────────┐
-│              @ngdb/ndb  +  @ngdb/nvdb                       │
+│                ndb  +  nvdb                                  │
 │                                                             │
 │  ┌─────────────────────┐  ┌─────────────────────┐          │
 │  │       nDB           │  │       nVDB          │          │
@@ -102,7 +102,7 @@ const client = new NGDBClient('https://api.example.com');
 await client.collections('users').insert({ name: 'Alice' });
 
 // Or standalone in Node.js/Electron
-const { Database } = require('@ngdb/ndb');
+const { Database } = require('ndb');
 const db = Database.open('./my-data');
 db.insert({ title: 'Hello World' });
 ```

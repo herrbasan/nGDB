@@ -29,7 +29,7 @@ Once individual modules are stable, they are published as standalone npm package
 ┌─────────────────────────────┼───────────────────────────────────┐
 │                             ▼                                   │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │               @ngdb/ndb  +  @ngdb/nvdb                   │  │
+│  │                  ndb  +  nvdb                              │  │
 │  │                                                          │  │
 │  │  ┌─────────────────────┐  ┌─────────────────────┐       │  │
 │  │  │       nDB           │  │       nVDB          │       │  │
@@ -89,16 +89,16 @@ nGDB/                          ← Main development workspace
 │   └── orm/                   ← Query translation
 ├── nDB/                       ← git submodule (nDB core)
 │   ├── src/                   ← Rust core & N-API dev
-│   └── package.json           ← @ngdb/ndb package
+│   └── package.json           ← ndb package
 ├── nVDB/                      ← git submodule (nVDB core)
 │   ├── src/                   ← Rust core & N-API dev
-│   └── package.json           ← @ngdb/nvdb package
+│   └── package.json           ← nvdb package
 ├── tests/                     ← Integration tests
 ├── examples/                  ← Usage examples
 └── package.json
     "dependencies": {
-      "@ngdb/ndb": "file:./nDB",    ← local dev link
-      "@ngdb/nvdb": "file:./nVDB"   ← local dev link
+      "ndb": "file:./nDB",          ← local dev link
+      "nvdb": "file:./nVDB"         ← local dev link
     }
 ```
 
@@ -110,15 +110,15 @@ Once modules are stable, they can be deployed independently:
 ```
 nGDB Server (includes nDB + nVDB via npm)
   ├── nGDB service layer
-  ├── @ngdb/ndb  (bundled string: nDB + internal Node.js bindings)
-  └── @ngdb/nvdb (bundled string: nVDB + internal Node.js bindings)
+  ├── ndb  (bundled: nDB + internal Node.js bindings)
+  └── nvdb (bundled: nVDB + internal Node.js bindings)
 ```
 
 **Option B: Standalone Packages**
 ```bash
 # For Node.js/Electron projects (no nGDB service)
-npm install @ngdb/ndb
-npm install @ngdb/nvdb
+npm install ndb
+npm install nvdb
 ```
 
 **Option C: Rust Direct**
@@ -429,13 +429,13 @@ For embedded use in Node.js/Electron without the nGDB service:
 
 ```typescript
 // Document database only
-import { Database as nDB } from '@ngdb/ndb';
+import { Database as nDB } from 'ndb';
 
 const db = nDB.open('./my-data');
 const id = db.insert({ title: 'Hello', tags: ['a', 'b'] });
 
 // Vector database only  
-import { Database as nVDB } from '@ngdb/nvdb';
+import { Database as nVDB } from 'nvdb';
 
 const vdb = nVDB.open('./vectors', { dim: 768 });
 vdb.upsert({ id: 'doc1', vector: embedding });
