@@ -1,0 +1,6 @@
+[submodule "ndb"]
+	path = ndb
+	url = https://github.com/herrbasan/nDB.git
+[submodule "nvdb"]
+	path = nvdb
+	url = https://github.com/herrbasan/nVDB.git
