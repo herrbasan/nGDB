@@ -1,0 +1,18 @@
+{
+  "name": "ngdb",
+  "version": "0.1.0",
+  "description": "Thin service wrapper that makes ndb and nvdb runnable as network services.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node tests/phase1_test.js"
+  },
+  "dependencies": {
+    "ndb": "file:./ndb/napi",
+    "nvdb": "file:./nvdb/napi"
+  },
+  "license": "MIT OR Apache-2.0",
+  "engines": {
+    "node": ">= 18"
+  }
+}

@@ -1,51 +1,39 @@
 # nGDB Design Document
 
-> n000b General Database Platform - A unified service layer for modular backends.
+> n000b General Database Platform - A service wrapper that makes ndb and nvdb runnable as network services.
 
 ## Overview
 
-nGDB is a **service platform** and **development workspace** for the nDB ecosystem. It provides:
+nGDB is a **thin service wrapper** around independent database modules. It is NOT a database itself — it provides the network layer that makes standalone modules accessible via HTTP/WebSocket.
 
-1. **Primary development workspace** - All modules (nDB, nVDB) are developed together as Git submodules. nBridge lives inside each as their submodule.
-2. **Unified REST/WebSocket API** - Service layer for production deployments
-3. **Integration testing** - End-to-end tests across all modules
-
-Once individual modules are stable, they are published as standalone npm packages for embedded use.
+**Key principle:** nDB and nVDB are independent projects with fundamentally different data models. nGDB does NOT try to unify their APIs. Instead, it proxies each backend's native API through a common network layer with shared cross-cutting concerns.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Clients                                 │
-│  (Web Apps, Mobile, MCP Agents, CLI tools, etc.)                │
+│  Web Apps, Mobile, MCP Agents, CLI tools, etc.                  │
 └─────────────────────────────────┬───────────────────────────────┘
                                   │ HTTP / WebSocket
 ┌─────────────────────────────────▼───────────────────────────────┐
-│                      nGDB Platform                              │
+│                      nGDB Service                               │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │  Service Layer: Auth, Routing, Connection Management    │   │
-│  │  ORM: Unified API translation                         │   │
+│  │  Middleware: Auth, Tenancy, Rate Limiting, Logging       │   │
 │  └─────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-                              │ uses npm packages
-┌─────────────────────────────┼───────────────────────────────────┐
-│                             ▼                                   │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │                  ndb  +  nvdb                              │  │
-│  │                                                          │  │
-│  │  ┌─────────────────────┐  ┌─────────────────────┐       │  │
-│  │  │       nDB           │  │       nVDB          │       │  │
-│  │  │   (Document DB)     │  │   (Vector DB)       │       │  │
-│  │  │                     │  │                     │       │  │
-│  │  │  ┌───────────────┐  │  │  ┌───────────────┐  │       │  │
-│  │  │   Rust Core   │  │  │  │   Rust Core   │  │       │  │
-│  │  │  JSON Lines   │  │  │  │  HNSW/SIMD    │  │       │  │
-│  │  └───────┬───────┘  │  │  └───────┬───────┘  │       │  │
-│  │          │          │  │          │          │       │  │
-│  │  ┌───────▼───────┐  │  │  ┌───────▼───────┐  │       │  │
-│  │  │N-API Bindings │  │  │  │N-API Bindings │  │       │  │
-│  │  │  (internal)   │  │  │  │  (internal)   │  │       │  │
-│  │  │  └───────────────┘  │  │  └───────────────┘  │       │  │
-│  │  └─────────────────────┘  └─────────────────────┘       │  │
-│  └──────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌──────────────────┐    ┌──────────────────┐                  │
+│  │  /db/*           │    │  /vdb/*          │                  │
+│  │  nDB proxy       │    │  nVDB proxy      │                  │
+│  │  passthrough     │    │  passthrough     │                  │
+│  └────────┬─────────┘    └────────┬─────────┘                  │
+│           │                       │                             │
+│  ┌────────▼─────────┐    ┌───────▼──────────┐                  │
+│  │  ndb module      │    │  nvdb module     │                  │
+│  │  direct calls    │    │  direct calls    │                  │
+│  └──────────────────┘    └──────────────────┘                  │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  /ws  /health  /metrics                                 │   │
+│  └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -53,70 +41,68 @@ Once individual modules are stable, they are published as standalone npm package
 
 | Project | Language | Purpose | Deployment |
 |---------|----------|---------|------------|
-| **nGDB** | Node.js/TypeScript | Service platform, unified API, auth, multi-tenancy | Server/Container |
-| **nDB** | Rust + N-API | Document database with internal Node.js bindings | npm package (standalone) |
-| **nVDB** | Rust + N-API | Vector database with internal Node.js bindings | npm package (standalone) |
+| **nGDB** | Vanilla JS | Service wrapper: HTTP/WS server, auth, multi-tenancy | Server/Container |
+| **nDB** | Rust + N-API | Document database - standalone project | npm package |
+| **nVDB** | Rust + N-API | Vector database - standalone project | npm package |
 
 ## Philosophy
 
-**nGDB is not a database - it's a database platform.**
+**nGDB is not a database — it is a service wrapper.**
 
-Instead of forcing one storage engine to handle all use cases poorly, nGDB lets you:
-- Use **nDB** for documents, metadata, and general-purpose storage
-- Use **nVDB** for embeddings and similarity search
-- Add new backends as needed (graph DB, time-series, etc.)
+nDB and nVDB have fundamentally different data models, query languages, and configurations. Attempting to unify them behind a single API creates leaky abstractions. Instead:
 
-**All through the same API.**
+- **nDB** handles documents: JSON Lines storage, file buckets, field-level queries
+- **nVDB** handles vectors: HNSW indices, SIMD distance, similarity search
+- **nGDB** handles the network: HTTP routing, auth, tenancy, WebSocket multiplexing
+
+Each module is a fully independent project with its own API. nGDB simply exposes them as network services.
 
 ### Core Beliefs
 
-- **The right tool for the job**: Documents and vectors need different storage models
-- **Unified interface**: Clients shouldn't care which backend serves their data
-- **Zero-copy where possible**: Rust backends, Node.js service layer
-- **Extensible**: New backend? Implement the interface, register it, done.
+- **No leaky abstractions**: Proxy each backend's native API, don't try to unify them
+- **Thin wrapper**: nGDB adds cross-cutting concerns, not business logic
+- **Independent modules**: Each module works standalone without nGDB
+- **Vanilla stack**: No frameworks, no TypeScript, no external dependencies
 
 ## Architecture
 
-nGDB serves as the **primary development workspace** where all modules are developed together before being split into standalone packages.
-
-### Development Workspace (nGDB)
+### Development Workspace
 
 ```
-nGDB/                          ← Main development workspace
-├── src/                       ← nGDB service layer
-│   ├── api/                   ← HTTP/WebSocket handlers
-│   ├── auth/                  ← Authentication
-│   └── orm/                   ← Query translation
-├── nDB/                       ← git submodule (nDB core)
-│   ├── src/                   ← Rust core & N-API dev
-│   └── package.json           ← ndb package
-├── nVDB/                      ← git submodule (nVDB core)
-│   ├── src/                   ← Rust core & N-API dev
-│   └── package.json           ← nvdb package
-├── tests/                     ← Integration tests
-├── examples/                  ← Usage examples
+nGDB/                          <- Service wrapper
+├── src/                       <- nGDB service layer
+│   ├── server.js              <- HTTP server entry point
+│   ├── middleware/             <- Auth, tenancy, rate limiting
+│   ├── handlers/              <- Transport-agnostic proxy handlers
+│   │   ├── db.js              <- /db/* -> ndb module calls
+│   │   └── vdb.js             <- /vdb/* -> nvdb module calls
+│   ├── transports/            <- Transport adapters
+│   │   ├── http.js            <- HTTP request/response adapter
+│   │   └── ws.js              <- WebSocket message adapter
+│   └── ws.js                  <- WebSocket server setup
+├── ndb/                       <- git submodule - independent project
+├── nvdb/                      <- git submodule - independent project
+├── tests/                     <- Integration tests
 └── package.json
     "dependencies": {
-      "ndb": "file:./nDB",          ← local dev link
-      "nvdb": "file:./nVDB"         ← local dev link
+      "ndb": "file:./ndb",
+      "nvdb": "file:./nvdb"
     }
 ```
 
 ### Production Deployment
 
-Once modules are stable, they can be deployed independently:
-
-**Option A: Full nGDB Platform (recommended)**
+**Option A: Full nGDB Service - recommended**
 ```
-nGDB Server (includes nDB + nVDB via npm)
-  ├── nGDB service layer
-  ├── ndb  (bundled: nDB + internal Node.js bindings)
-  └── nvdb (bundled: nVDB + internal Node.js bindings)
+nGDB Server
+  ├── nGDB service layer - HTTP/WS, auth, tenancy
+  ├── ndb  - bundled: nDB + Node.js bindings
+  └── nvdb - bundled: nVDB + Node.js bindings
 ```
 
 **Option B: Standalone Packages**
 ```bash
-# For Node.js/Electron projects (no nGDB service)
+# For Node.js/Electron projects - no nGDB service needed
 npm install ndb
 npm install nvdb
 ```
@@ -128,116 +114,136 @@ dependencies.ndb = "0.1"
 dependencies.nvdb = "0.1"
 ```
 
-### Why This Approach?
-
-| Phase | Setup | Purpose |
-|-------|-------|---------|
-| **Development** | nGDB workspace with submodules | Develop all modules together, integration testing |
-| **Production** | Published npm packages | Stable releases, semver versioning |
-| **Standalone** | Individual npm packages | Embed in any Node.js/Electron project |
-
 ### Service Layer
 
 ```
 ┌─────────────────────────────────────────────┐
 │           HTTP / WebSocket Server           │
-│  - Raw Native Router (Zero Middleware)      │
-│  - Direct Request/Response Pipelining       │
-│  - Connection pooling                       │
+│  - Vanilla Node.js HTTP server              │
+│  - No Express/Fastify                       │
+│  - Direct request/response pipelining       │
 ├─────────────────────────────────────────────┤
-│         Authentication & AuthZ              │
+│         Middleware Pipeline                  │
 │  - API key / JWT validation                 │
 │  - Tenant isolation                         │
-│  - Permission checks                        │
+│  - Rate limiting                            │
+│  - Request logging                          │
 ├─────────────────────────────────────────────┤
-│              ORM / Router                   │
-│  - Collection type detection                │
-│  - Backend selection                        │
-│  - AST Request pass-through                 │
-│  - Result formatting                        │
+│         Transport Adapters                  │
+│  - HTTP adapter  -> parses req, calls handler│
+│  - WS adapter    -> parses msg, calls handler│
+│  - Same handlers for both transports        │
 ├─────────────────────────────────────────────┤
-│         Backend Registry                    │
-│  - nDB driver                               │
-│  - nVDB driver                              │
-│  - (extensible)                             │
+│         Shared Handlers                     │
+│  - /db/*    -> ndb module direct calls      │
+│  - /vdb/*   -> nvdb module direct calls     │
+│  - Transport-agnostic: params in, result out│
+├─────────────────────────────────────────────┤
+│  /health  -> service health check           │
+│  /metrics -> Prometheus metrics             │
 └─────────────────────────────────────────────┘
 ```
 
-### Backend Registration
+## Proxy Routes
 
-Backends register themselves with nGDB at startup:
+nGDB proxies each backend's native API. There is no translation layer — requests pass through to the module's Node.js API directly.
 
-```typescript
-// nGDB initialization
-import { nDBBackend } from './backends/ndb';
-import { nVDBBackend } from './backends/nvdb';
+### nDB Routes - /db/*
 
-const ngdb = new NGDBServer({
-  backends: {
-    'document': nDBBackend,
-    'vector': nVDBBackend,
-    // Future: 'graph': graphBackend,
-  },
-  defaultBackend: 'document',
-});
+All nDB operations are proxied through `/db/*`. The route structure mirrors nDB's native Node.js API:
 
-await ngdb.start();
-```
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/db/open` | POST | Open database instance |
+| `/db/close` | POST | Close database instance |
+| `/db/insert` | POST | Insert document |
+| `/db/get` | POST | Get document by ID |
+| `/db/update` | POST | Update document |
+| `/db/delete` | POST | Delete document |
+| `/db/query` | POST | Query with filters |
+| `/db/bucket/*` | * | File bucket operations |
 
-### Collection Types
+Request bodies map directly to nDB's Node.js function parameters.
 
-Collections declare their type on creation:
+### nVDB Routes - /vdb/*
+
+All nVDB operations are proxied through `/vdb/*`. The route structure mirrors nVDB's native Node.js API:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/vdb/open` | POST | Open vector database |
+| `/vdb/close` | POST | Close vector database |
+| `/vdb/upsert` | POST | Upsert vector document |
+| `/vdb/search` | POST | Similarity search |
+| `/vdb/delete` | POST | Delete vector document |
+| `/vdb/get` | POST | Get vector document by ID |
+
+Request bodies map directly to nVDB's Node.js function parameters.
+
+### Service Routes
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Service health + backend status |
+| `/metrics` | GET | Prometheus-format metrics |
+| `/ws` | GET | WebSocket upgrade |
+
+### Shared Handler Pattern
+
+HTTP and WebSocket share the same handler code. The proxy logic is transport-agnostic — handlers receive a plain request object and return a plain response object, regardless of transport.
 
 ```javascript
-// HTTP API
-POST /collections
-{
-  "name": "users",
-  "type": "document",      // → routed to nDB
-  "config": { ... }
+// src/handlers/db.js — transport-agnostic handlers
+const ndb = require('ndb');
+
+// Handler: insert document
+// Works identically for HTTP POST and WebSocket message
+function insert(params) {
+  return ndb.insert(params);
 }
 
-POST /collections
-{
-  "name": "embeddings", 
-  "type": "vector",        // → routed to nVDB
-  "config": {
-    "dim": 768,
-    "metric": "cosine"
-  }
+// Handler: query documents
+function query(params) {
+  return ndb.query(params);
+}
+
+module.exports = { insert, query, get, update, delete };
+
+// src/transports/http.js — HTTP adapter
+const handlers = require('../handlers/db');
+
+async function route(req, res) {
+  const body = await parseBody(req);
+  const handler = handlers[req.params.action];
+  const result = handler(body);
+  json(res, 200, result);
+}
+
+// src/transports/ws.js — WebSocket adapter
+const handlers = require('../handlers/db');
+
+function onMessage(message) {
+  const { action, params, requestId } = JSON.parse(message);
+  const handler = handlers[action];
+  const result = handler(params);
+  ws.send(JSON.stringify({ requestId, result }));
 }
 ```
 
-## Unified API
+**Key insight:** Code written for bundled nDB/nVDB usage works identically through the service. The handler layer IS the module's native API — no translation needed.
 
-### REST Endpoints
+## WebSocket API
 
-All backends expose the same REST interface:
-
-| Endpoint | Method | Description | Backend Mapping |
-|----------|--------|-------------|-----------------|
-| `/collections` | GET | List collections | All |
-| `/collections` | POST | Create collection | All |
-| `/collections/:name` | DELETE | Drop collection | All |
-| `/collections/:name/docs` | GET | Query documents | nDB |
-| `/collections/:name/docs` | POST | Insert document | nDB |
-| `/collections/:name/docs/:id` | GET | Get by ID | nDB |
-| `/collections/:name/docs/:id` | PUT | Update by ID | nDB |
-| `/collections/:name/docs/:id` | DELETE | Delete by ID | nDB |
-| `/collections/:name/search` | POST | Vector search | nVDB |
-| `/collections/:name/upsert` | POST | Upsert vectors | nVDB |
-
-### WebSocket API
-
-Real-time subscriptions and streaming:
+Real-time subscriptions and streaming over a single WebSocket connection:
 
 ```javascript
 // Client connects via WebSocket
 const ws = new WebSocket('ws://ngdb.example.com/ws');
 
-// Subscribe to collection changes
+// Subscribe to nDB collection changes
 ws.send(JSON.stringify({
   action: 'subscribe',
+  backend: 'db',
   collection: 'users',
   filter: { status: 'active' }
 }));
@@ -245,74 +251,8 @@ ws.send(JSON.stringify({
 // Receive real-time updates
 ws.onmessage = (event) => {
   const update = JSON.parse(event.data);
-  // { type: 'insert'|'update'|'delete', doc: {...} }
+  // { backend: 'db', type: 'insert'|'update'|'delete', doc: {...} }
 };
-```
-
-### Query Language
-
-Unified query syntax across backends:
-
-```javascript
-// Document queries (nDB)
-POST /collections/users/docs
-{
-  "query": {
-    "and": [
-      { "field": "status", "eq": "active" },
-      { "field": "created", "gt": "2024-01-01" }
-    ]
-  },
-  "sort": { "created": "desc" },
-  "limit": 100
-}
-
-// Vector search (nVDB)
-POST /collections/embeddings/search
-{
-  "vector": [0.1, 0.2, ...],  // or "text" for auto-embed
-  "topK": 10,
-  "filter": {                 // metadata filter
-    "and": [
-      { "field": "category", "eq": "docs" }
-    ]
-  }
-}
-```
-
-## Backend Driver Interface
-
-Each backend implements a standard interface:
-
-```typescript
-interface BackendDriver {
-  name: string;
-  version: string;
-  
-  // Lifecycle
-  initialize(config: BackendConfig): Promise<void>;
-  shutdown(): Promise<void>;
-  
-  // Collections
-  createCollection(name: string, config: unknown): Promise<Collection>;
-  dropCollection(name: string): Promise<void>;
-  listCollections(): Promise<string[]>;
-  
-  // Documents (nDB)
-  insert?(collection: string, doc: unknown): Promise<string>;
-  get?(collection: string, id: string): Promise<unknown>;
-  update?(collection: string, id: string, doc: unknown): Promise<void>;
-  delete?(collection: string, id: string): Promise<void>;
-  query?(collection: string, query: Query): Promise<QueryResult>;
-  
-  // Vectors (nVDB)
-  upsertVectors?(collection: string, vectors: VectorDoc[]): Promise<void>;
-  searchVectors?(collection: string, query: VectorQuery): Promise<VectorResult[]>;
-  rebuildIndex?(collection: string): Promise<void>;
-  
-  // Events (for WebSocket subscriptions)
-  subscribe?(collection: string, filter: Filter): EventEmitter;
-}
 ```
 
 ## Configuration
@@ -322,22 +262,17 @@ interface BackendDriver {
 server:
   port: 3000
   host: 0.0.0.0
-  
+
 auth:
   type: jwt
   secret: ${JWT_SECRET}
-  
+
 backends:
   ndb:
     dataDir: ./data/ndb
-    trashMode: manual
-    
   nvdb:
     dataDir: ./data/nvdb
-    defaultMetric: cosine
-    
-  # Future: graph, timeseries, etc.
-  
+
 limits:
   maxRequestSize: 10mb
   maxBatchSize: 1000
@@ -346,7 +281,7 @@ limits:
 
 ## Deployment Patterns
 
-### Single-Node (Development)
+### Single-Node - Development
 
 ```
 ┌─────────────────────────────┐
@@ -358,7 +293,7 @@ limits:
 └─────────────────────────────┘
 ```
 
-### Multi-Tenant (Production)
+### Multi-Tenant - Production
 
 ```
 ┌─────────────────────────────────────┐
@@ -368,20 +303,20 @@ limits:
     ┌───────────┼───────────┐
     ▼           ▼           ▼
 ┌────────┐  ┌────────┐  ┌────────┐
-│ nGDB-1 │  │ nGDB-2 │  │ nGDB-3 │  (stateless)
+│ nGDB-1 │  │ nGDB-2 │  │ nGDB-3 │  - stateless
 └────┬───┘  └────┬───┘  └────┬───┘
      │           │           │
      └───────────┼───────────┘
                  ▼
         ┌─────────────────┐
         │  Shared Storage │
-        │  (NFS/EFS/etc)  │
+        │  NFS/EFS/etc    │
         └─────────────────┘
 ```
 
 ### Embedded Mode
 
-Clients can use nDB/nVDB directly without nGDB:
+Clients use nDB/nVDB directly without nGDB:
 
 ```rust
 // Direct Rust usage
@@ -395,48 +330,53 @@ const db = ndb.open('./data');
 
 ## Client SDK Examples
 
-### JavaScript/TypeScript (nGDB Client)
+### JavaScript - nGDB Client
 
-```typescript
-impjavascript
-// Document operations
-await client.collections('users').insert({ name: 'Alice', email: 'alice@example.com' });
-const user = await client.collections('users').get('alice-id');
+```javascript
+// Document operations via nGDB proxy
+const response = await fetch('http://localhost:3000/db/insert', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer ngdb_sk_abc123', 'Content-Type': 'application/json' },
+  body: JSON.stringify({ collection: 'users', doc: { name: 'Alice', email: 'alice@example.com' } })
+});
+const { id } = await response.json();
 
-// LLM-Native JSON AST Query (No fluent builders)
-const activeUsers = await client.postQuery('users', {
-  $and: [{ status: { $eq: 'active' } }],
-  $sort: { created: 'desc' },
-  $limit: 10
+// Query documents
+const results = await fetch('http://localhost:3000/db/query', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer ngdb_sk_abc123', 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    collection: 'users',
+    query: { and: [{ field: 'status', eq: 'active' }] },
+    sort: { created: 'desc' },
+    limit: 10
+  })
 });
 
-// Vector operations
-await client.collections('embeddings').upsert({
-  id: 'doc1',
-  vector: [0.1, 0.2, 0.3],
-  metadata: { category: 'tech' }
+// Vector search via nGDB proxy
+const similar = await fetch('http://localhost:3000/vdb/search', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer ngdb_sk_abc123', 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    collection: 'embeddings',
+    vector: [0.1, 0.2, 0.3],
+    topK: 5
+  })
 });
+```
 
-const similar = await client.postVectorSearch('embeddings', {
-  vector: [0.1, 0.2, 0.3],
-  topK: 5,
-  filter: { category: { $eq: 'tech' } }
-}
-
-### JavaScript/TypeScript (Standalone nDB/nVDB)
+### JavaScript - Standalone nDB/nVDB
 
 For embedded use in Node.js/Electron without the nGDB service:
 
-```typescript
+```javascript
 // Document database only
-import { Database as nDB } from 'ndb';
-
+const { Database: nDB } = require('ndb');
 const db = nDB.open('./my-data');
 const id = db.insert({ title: 'Hello', tags: ['a', 'b'] });
 
-// Vector database only  
-import { Database as nVDB } from 'nvdb';
-
+// Vector database only
+const { Database: nVDB } = require('nvdb');
 const vdb = nVDB.open('./vectors', { dim: 768 });
 vdb.upsert({ id: 'doc1', vector: embedding });
 const results = vdb.search(queryVector, { topK: 10 });
@@ -445,30 +385,35 @@ const results = vdb.search(queryVector, { topK: 10 });
 ### Python
 
 ```python
-from ngdb import Client
+import requests
 
-client = Client("https://api.example.com")
+client = requests.Session()
+client.headers['Authorization'] = 'Bearer ngdb_sk_abc123'
+client.headers['Content-Type'] = 'application/json'
 
-# Same API surface regardless of backend
-docs = client.collections("users").query(
-    filter={"status": "active"},
-    sort=[("created", "desc")],
-    limit=10
-)
+# Document query via nGDB proxy
+docs = client.post('http://localhost:3000/db/query', json={
+    'collection': 'users',
+    'query': { 'and': [{ 'field': 'status', 'eq': 'active' }] },
+    'limit': 10
+}).json()
 
-results = client.collections("embeddings").search(
-    vector=[0.1, 0.2, ...],
-    top_k=5
-)
+# Vector search via nGDB proxy
+results = client.post('http://localhost:3000/vdb/search', json={
+    'collection': 'embeddings',
+    'vector': [0.1, 0.2],
+    'topK': 5
+}).json()
 ```
 
-## Authentication & Security
+## Authentication and Security
 
 ### API Key Authentication
 
 ```http
-GET /collections/users/docs
+POST /db/insert
 Authorization: Bearer ngdb_sk_abc123xyz
+Content-Type: application/json
 ```
 
 ### Tenant Isolation
@@ -487,20 +432,24 @@ const ngdb = new NGDBServer({
 # permissions.yaml
 roles:
   admin:
-    - collections:*
+    - db:*
+    - vdb:*
   developer:
-    - collections:read
-    - collections:write
+    - db:read
+    - db:write
+    - vdb:read
+    - vdb:write
   readonly:
-    - collections:read
+    - db:read
+    - vdb:read
 ```
 
-## Monitoring & Observability
+## Monitoring and Observability
 
 ```typescript
-// Metrics exposed at /metrics (Prometheus format)
-ngdb_requests_total{backend="ndb", operation="insert"} 1024
-ngdb_requests_duration_seconds_bucket{le="0.1"} 950
+// Metrics exposed at /metrics - Prometheus format
+ngdb_requests_total{backend="ndb", route="insert"} 1024
+ngdb_requests_duration_seconds_bucket{backend="nvdb", route="search", le="0.1"} 950
 ngdb_active_connections 42
 
 // Health check
@@ -518,48 +467,51 @@ GET /health
 
 | Feature | nGDB + nDB/nVDB | MongoDB | PostgreSQL + pgvector | Pinecone | Supabase |
 |---------|-----------------|---------|----------------------|----------|----------|
-| **Self-hosted** | ✅ Yes | ✅ Yes | ✅ Yes | ❌ No | ⚠️ Partial |
-| **Unified API** | ✅ Yes | ❌ Separate | ⚠️ Extensions | ❌ Vectors only | ❌ Separate |
-| **Embeddings** | ✅ nVDB | ⚠️ Atlas only | ✅ pgvector | ✅ Yes | ✅ pgvector |
-| **File storage** | ✅ Built-in | ⚠️ GridFS | ❌ External | ❌ No | ❌ External |
-| **Human-readable** | ✅ JSON Lines | ❌ Binary | ❌ Binary | ❌ No | ❌ Binary |
-| **Zero dependencies** | ⚠️ Rust core | ❌ Many | ❌ Many | N/A | ❌ Many |
+| **Self-hosted** | Yes | Yes | Yes | No | Partial |
+| **Proxy architecture** | Yes | N/A | N/A | N/A | N/A |
+| **Embeddings** | nVDB | Atlas only | pgvector | Yes | pgvector |
+| **File storage** | Built-in | GridFS | External | No | External |
+| **Human-readable** | JSON Lines | No | No | No | No |
+| **Zero dependencies** | Rust core | Many | Many | N/A | Many |
 
 ## Roadmap
 
-### Phase 1: Core Platform
-- [ ] HTTP REST API
-- [ ] nDB backend integration
-- [ ] Basic auth
-- [ ] JavaScript client SDK
+### Phase 1: Core Service ✅
+- [x] Vanilla Node.js HTTP server
+- [x] nDB proxy routes - /db/*
+- [ ] Basic auth - API keys
+- [x] Health check endpoint
 
-### Phase 2: Real-Time
-- [ ] WebSocket API
-- [ ] Subscriptions
-- [ ] Change streams
+### Phase 2: Document API ✅
+- [x] Complete nDB proxy surface
+- [x] Query passthrough
+- [x] File bucket proxy
 
-### Phase 3: Vector Support
-- [ ] nVDB backend integration
-- [ ] Embedding service integration
-- [ ] Hybrid search (vector + filter)
+### Phase 3: Real-Time ✅
+- [x] WebSocket server
+- [x] Subscriptions
+- [x] Change streams
 
-### Phase 4: Scale
+### Phase 4: Production Features
+- [ ] JWT authentication
 - [ ] Multi-tenancy
-- [ ] Horizontal scaling
-- [ ] Replication
+- [ ] Rate limiting
+- [ ] Prometheus metrics
 
-### Phase 5: Ecosystem
+### Phase 5: Vector Support
+- [ ] nVDB proxy routes - /vdb/*
+- [ ] Search passthrough
+
+### Phase 6: Ecosystem
+- [ ] JavaScript client SDK
 - [ ] Python SDK
-- [ ] Go SDK
-- [ ] GraphQL API
 - [ ] Admin dashboard
 
 ## Related Documents
 
-- [nDB Specification](./nDB-spec.md) - Document database backend
-- nVDB Specification (TBD) - Vector database backend
-- [nBridge Documentation](./nBridge-spec.md) - Rust/Node.js bridge
+- [nDB Specification](./nDB-spec.md) - Document database - independent project
+- [nVDB Documentation](../nvdb/README.md) - Vector database - independent project
 
 ---
 
-*"One platform, multiple engines, unified API."*
+*"Thin wrapper, independent engines, no leaky abstractions."*

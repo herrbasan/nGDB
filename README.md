@@ -1,55 +1,49 @@
 # nGDB
 
-> n000b General Database Platform - A modular database ecosystem for the AI age.
+> n000b General Database Platform - A service wrapper that makes ndb and nvdb runnable as network services.
 
 ## Vision
 
-nGDB is not a single database—it's a **database platform**. Instead of forcing one storage engine to handle every use case poorly, we provide specialized backends with a unified API:
+nGDB is not a database — it's a **thin service wrapper**. It takes two independent database modules and exposes them as a network service with shared cross-cutting concerns:
 
-- **nDB** for documents, metadata, and general-purpose storage (JSON Lines)
-- **nVDB** for embeddings and similarity search (HNSW, SIMD)
-- **Future backends** for graphs, time-series, etc.
+- **nDB** — Document database (JSON Lines, file buckets, field-level queries) — independent project
+- **nVDB** — Vector database (HNSW, SIMD, similarity search) — independent project
+- **nGDB** — HTTP/WS service layer (auth, tenancy, routing) — this repo
 
-**All through the same REST/WebSocket API.**
+**Each backend keeps its own native API. nGDB proxies, it doesn't translate.**
 
 ## Philosophy
 
-- **The right tool for the job** - Documents and vectors need different storage models
-- **Unified interface** - Clients shouldn't care which backend serves their data  
-- **Zero-copy where possible** - Rust backends, Node.js service layer
-- **Human-readable** - When it makes sense (nDB uses JSON Lines)
-- **Own your code** - Minimal dependencies, maximum understanding
+- **No leaky abstractions** — nDB and nVDB have fundamentally different data models. Don't unify them.
+- **Proxy, don't translate** — `/db/*` maps to nDB, `/vdb/*` maps to nVDB. Direct passthrough.
+- **Independent modules** — Each module works standalone without nGDB.
+- **Thin wrapper** — nGDB adds cross-cutting concerns (auth, tenancy, WebSocket), not business logic.
+- **Own your code** — Vanilla JS, no frameworks, minimal dependencies.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     nGDB Platform                           │
-│         (REST API + WebSocket + Service Layer)              │
-│                    Node.js / TypeScript                     │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼ uses npm packages
-┌─────────────────────────────────────────────────────────────┐
-│                ndb  +  nvdb                                  │
-│                                                             │
-│  ┌─────────────────────┐  ┌─────────────────────┐          │
-│  │       nDB           │  │       nVDB          │          │
-│  │   (Document DB)     │  │   (Vector DB)       │          │
-│  │   JSON Lines        │  │   HNSW / SIMD       │          │
-│  │   File Buckets      │  │   Binary Storage    │          │
-│  │                     │  │                     │          │
-│  ┌───────────────┐  │  │  ┌───────────────┐  │          │
-│  │   Rust Core   │  │  │  │   Rust Core   │  │          │
-│  │  JSON Lines   │  │  │  │  HNSW/SIMD    │  │          │
-│  └───────┬───────┘  │  │  └───────┬───────┘  │          │
-│          │          │  │          │          │          │
-│  ┌───────▼───────┐  │  │  ┌───────▼───────┐  │          │
-│  │ N-API Bindings│  │  │  │ N-API Bindings│  │          │
-│  │  (internal)   │  │  │  │  (internal)   │  │          │
-│  └───────────────┘  │  │  └───────────────┘  │          │
-└─────────────────────┘  └─────────────────────┘          │
-└─────────────────────────────────────────────────────────────┘
+│                      nGDB Service                           │
+│         Vanilla Node.js HTTP + WebSocket Server             │
+├─────────────────────────────────────────────────────────────┤
+│  Middleware: Auth, Tenancy, Rate Limiting, Logging          │
+├────────────────────────┬────────────────────────────────────┤
+│     /db/*              │         /vdb/*                     │
+│     nDB proxy          │         nVDB proxy                 │
+│     passthrough        │         passthrough                │
+├────────────────┬───────┴──────────────┬─────────────────────┤
+│    ndb module  │                      │  nvdb module        │
+│    direct call │                      │  direct call        │
+└────────────────┘                      └─────────────────────┘
+         │                                       │
+    ┌────▼─────────┐                    ┌────────▼──────┐
+    │     nDB      │                    │     nVDB      │
+    │ Document DB  │                    │  Vector DB    │
+    │ JSON Lines   │                    │  HNSW/SIMD    │
+    │ File Buckets │                    │ Binary Store  │
+    │ Rust + N-API │                    │ Rust + N-API  │
+    └──────────────┘                    └───────────────┘
 ```
 
 ## Repositories
@@ -58,19 +52,19 @@ This is the **development workspace** containing all components as Git submodule
 
 | Submodule | Repository | Status | Description |
 |-----------|------------|--------|-------------|
-| `ndb/` | [herrbasan/nDB](https://github.com/herrbasan/nDB) | 🏗️ Empty | Document database (JSON Lines). Custom N-API bindings built in. |
-| `nvdb/` | [herrbasan/nVDB](https://github.com/herrbasan/nVDB) | ✅ Complete | Vector database (HNSW, SIMD). Custom N-API bindings built in. |
+| `ndb/` | [herrbasan/nDB](https://github.com/herrbasan/nDB) | 🏗️ Ready | Document database — independent project |
+| `nvdb/` | [herrbasan/nVDB](https://github.com/herrbasan/nVDB) | ✅ Complete | Vector database — independent project |
 
 ## Documentation
 
 All specifications and development plans are in the `docs/` folder:
 
 ### Specifications (Detailed Reference)
-- [docs/nGDB-spec.md](docs/nGDB-spec.md) - Service platform architecture
+- [docs/nGDB-spec.md](docs/nGDB-spec.md) - Service wrapper architecture (proxy design)
 - [docs/nDB-spec.md](docs/nDB-spec.md) - Document database design  
 
 ### Development Plans (Execution Roadmaps)
-- [docs/nGDB-development-plan.md](docs/nGDB-development-plan.md) - 5-phase service roadmap
+- [docs/nGDB-development-plan.md](docs/nGDB-development-plan.md) - 6-phase service roadmap
 - [docs/nDB-development-plan.md](docs/nDB-development-plan.md) - 6-phase database roadmap
 
 Start with [docs/README.md](docs/README.md) for the full overview.
@@ -89,19 +83,21 @@ git submodule update --init --recursive
 # Directory structure
 nGDB/
 ├── docs/              # Documentation
-├── ndb/               # Document database submodule
-├── nvdb/              # Vector database submodule
+├── ndb/               # Document database submodule (independent project)
+├── nvdb/              # Vector database submodule (independent project)
 └── README.md          # This file
 ```
 
 ### Usage (Future)
 
 ```javascript
-// Via nGDB service
-const client = new NGDBClient('https://api.example.com');
-await client.collections('users').insert({ name: 'Alice' });
+// Via nGDB service — proxy routes
+const result = await fetch('http://localhost:3000/db/insert', {
+  method: 'POST',
+  body: JSON.stringify({ collection: 'users', doc: { name: 'Alice' } })
+});
 
-// Or standalone in Node.js/Electron
+// Or standalone in Node.js/Electron — no nGDB needed
 const { Database } = require('ndb');
 const db = Database.open('./my-data');
 db.insert({ title: 'Hello World' });
@@ -111,9 +107,9 @@ db.insert({ title: 'Hello World' });
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| nVDB | ✅ Complete | Reference implementation with internal N-API |
-| nDB | 🏗️ Ready | Implement core, implement N-API directly |
-| nGDB | 🏗️ Ready | Scaffold service layer |
+| nVDB | ✅ Complete | Vector database with internal N-API |
+| nDB | 🏗️ Ready | Document database — implement core + N-API |
+| nGDB | 🏗️ Ready | Service wrapper — scaffold proxy routes |
 
 ## Development Workflow
 
@@ -122,7 +118,7 @@ We follow a **submodule-based workflow**:
 1. **Develop in nGDB workspace** - All modules together for integration testing
 2. **Reference the specs** - Implementation details in `docs/`
 3. **Follow the plans** - Phased approach in `docs/*-development-plan.md`
-4. **Publish independently** - Stable modules released to npm
+4. **Publish independently** - Stable modules released to npm as standalone packages
 
 ## Why?
 
@@ -131,10 +127,10 @@ Most database projects try to be everything:
 - Vector DBs struggle with complex metadata queries
 - SQL databases force tabular structure on everything
 
-**nGDB embraces specialization:**
+**nGDB embraces specialization without forced unification:**
 - Use nDB for documents (human-readable JSON Lines)
 - Use nVDB for vectors (optimized HNSW graphs)
-- Same API, different backends
+- nGDB proxies each backend's native API — no leaky abstractions
 
 ## License
 

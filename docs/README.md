@@ -8,7 +8,7 @@
 
 | Document | Description | Status |
 |----------|-------------|--------|
-| [nGDB Spec](./nGDB-spec.md) | Service platform architecture | 📝 Draft |
+| [nGDB Spec](./nGDB-spec.md) | Service wrapper architecture (proxy design) | 📝 Draft |
 | [nDB Spec](./nDB-spec.md) | Document database (JSON Lines) | 📝 Draft |
 | nVDB Spec | Vector database (HNSW) | ✅ Complete (reference) |
 
@@ -16,21 +16,21 @@
 
 | Document | Phases | Current Phase |
 |----------|--------|---------------|
-| [nGDB Development Plan](./nGDB-development-plan.md) | 5 phases | Not started |
+| [nGDB Development Plan](./nGDB-development-plan.md) | 6 phases | Not started |
 | [nDB Development Plan](./nDB-development-plan.md) | 6 phases | Not started |
 
 ## Project Structure
 
 ```
-nGDB/                          ← This repository (development workspace)
-├── docs/                      ← Documentation (you are here)
-│   ├── README.md              ← This file
-│   ├── nGDB-spec.md           ← Service platform spec
-│   ├── nDB-spec.md            ← Document database spec
+nGDB/                          <- This repository (service wrapper)
+├── docs/                      <- Documentation (you are here)
+│   ├── README.md              <- This file
+│   ├── nGDB-spec.md           <- Service wrapper spec
+│   ├── nDB-spec.md            <- Document database spec
 │   ├── nGDB-development-plan.md
 │   └── nDB-development-plan.md
-├── ndb/                       ← Git submodule
-└── nvdb/                      ← Git submodule
+├── ndb/                       <- Git submodule (independent project)
+└── nvdb/                      <- Git submodule (independent project)
 ```
 
 ## Ecosystem Overview
@@ -38,28 +38,25 @@ nGDB/                          ← This repository (development workspace)
 ```
 Clients (Web, Mobile, MCP Agents)
            │
-           ▼ HTTP/WebSocket
+           ▼ HTTP/REST or WebSocket
     ┌──────────────────┐
-    │   nGDB Platform  │  ← Node.js service (this repo's src/)
-    │   (unified API)  │
-    └──────────────────┘
-           │ uses npm packages
-           ▼
-    ┌──────────────────┐
-    │  ndb             │
-    │  nvdb            │
-    └──────────────────┘
-           │
-    ┌──────┴──────┐
-    ▼             ▼
-┌─────────┐  ┌─────────┐
-│   nDB   │  │  nVDB   │
-│(Rust)   │  │ (Rust)  │
-│         │  │         │
-│N-API    │  │N-API    │
-│(native) │  │(native) │
-└─────────┘  └─────────┘
+    │   nGDB Service   │  <- Thin service wrapper (this repo)
+    │   Proxy + Auth   │
+    └──────┬───────────┘
+           │ direct module calls
+    ┌──────┴───────────┐
+    ▼                  ▼
+┌─────────┐     ┌─────────┐
+│   nDB   │     │  nVDB   │
+│(Rust)   │     │ (Rust)  │
+│N-API    │     │N-API    │
+│(native) │     │(native) │
+└─────────┘     └─────────┘
 ```
+
+nGDB is a **thin service wrapper** — it proxies each backend's native API through `/db/*` and `/vdb/*` routes. No ORM, no query translation, no unified abstraction. Code written for bundled nDB/nVDB usage works identically through the service.
+
+HTTP and WebSocket share the same handler code — the proxy logic is transport-agnostic.
 
 ## Repository Structure
 
@@ -67,16 +64,16 @@ Clients (Web, Mobile, MCP Agents)
 
 | Repository | Purpose | Contains |
 |------------|---------|----------|
-| [herrbasan/nGDB](https://github.com/herrbasan/nGDB) | Development workspace | This repo - docs, submodules |
-| [herrbasan/nDB](https://github.com/herrbasan/nDB) | Document database | Rust core + N-API bindings |
-| [herrbasan/nVDB](https://github.com/herrbasan/nVDB) | Vector database | Rust core + N-API bindings |
+| [herrbasan/nGDB](https://github.com/herrbasan/nGDB) | Service wrapper | This repo - docs, submodules, service layer |
+| [herrbasan/nDB](https://github.com/herrbasan/nDB) | Document database | Rust core + N-API bindings (independent project) |
+| [herrbasan/nVDB](https://github.com/herrbasan/nVDB) | Vector database | Rust core + N-API bindings (independent project) |
 
 ### Submodule Chain
 
 ```
-nGDB/                          ← Development workspace
-├── ndb/                       ← submodule to nDB repo
-└── nvdb/                      ← submodule to nVDB repo
+nGDB/                          <- Service wrapper
+├── ndb/                       <- submodule to nDB repo
+└── nvdb/                      <- submodule to nVDB repo
 ```
 
 ## Current Status
@@ -84,8 +81,8 @@ nGDB/                          ← Development workspace
 - ✅ **Specifications** - All drafted and ready for reference
 - ✅ **Repository structure** - Submodules imported
 - ⏳ **nDB** - Ready to implement core and internal N-API
-- ⏳ **nGDB** - Ready to scaffold service layer
-- ✅ **nVDB** - Complete reference implementation (internal N-API needs refactoring if applicable)
+- ⏳ **nGDB** - Ready to scaffold service wrapper
+- ✅ **nVDB** - Complete reference implementation
 
 ## Getting Started
 
@@ -111,8 +108,8 @@ nGDB/                          ← Development workspace
 2. **Follow the dev plans** - Phased approach with clear deliverables
 3. **Internal N-API** - Implement Node.js bindings tightly coupled inside each Rust backend
 4. **Test integration in nGDB** - All modules together for end-to-end testing
-5. **Publish independently** - Stable modules released to npm
+5. **Publish independently** - Stable modules released to npm as standalone packages
 
 ---
 
-*Last updated: 2026-03-26*
+*Last updated: 2026-03-27*
