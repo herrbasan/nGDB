@@ -121,26 +121,119 @@ db.insert_with_prefix("conv", doc)?;  // → "conv_V1StGXR8Z5jdHi6B"
 
 ## Storage Format
 
-### JSON Lines (NDJSON) - Documents with File Metadata
+### Database = Folder
 
-Each line is one complete JSON object. Append-only. **No binary data inside.**
+Each database is a **folder** named after the database. Inside: a metadata file, the data file, a trash file, and bucket folders.
 
-File metadata lives in the document; only the content is external.
-
-```jsonl
-{"_meta":{"version":1,"created":"2026-03-26"}}
-{"_id":"V1StGXR8Z5jdHi6B","title":"AI Discussion","attachments":[{"_file":{"bucket":"attachments","id":"a3f5c2d1","ext":"png","name":"screenshot.png","size":45678,"type":"image/png","created":1234567890}}],"created_at":1234567890}
-{"_id":"V1StGXR8Z5jdHi6B","_deleted":1234567900}
+```
+data/
+  ndb/
+    countries/                      ← Database folder = database name
+      meta.json                     ← Database metadata (config, display, buckets)
+      db.jsonl                      ← Active documents (pure append-only)
+      trash.jsonl                   ← Soft-deleted documents
+      buckets/                      ← Binary file storage
+        attachments/
+          a3f5c2d1.png              ← hash.ext format
+          _trash/                   ← Per-bucket trash for deleted files
+            b7e9a4f2.jpg
+        thumbnails/
+          a3f5c2d1_128x128.png
+          _trash/
+    conversations/                  ← Another database
+      meta.json
+      db.jsonl
+      trash.jsonl
+      buckets/
+        media/
+          x1y2z3a4.mp3
+          _trash/
 ```
 
-**Structure:**
-- `_file` objects contain full metadata (name, type, size, dates)
-- `bucket` + `id` + `ext` forms the pointer to actual file on disk
-- Original filename preserved in `name` field
-- File content is never in JSON - always external
+**Key rules:**
+- Database name = folder name — no indirection
+- `db.jsonl` — standardized name, pure append-only log, no metadata line
+- `trash.jsonl` — single file for all soft-deleted documents
+- `buckets/` — binary storage, each bucket is a subfolder
+- `_trash/` inside each bucket — deleted files (underscore prefix = hidden)
+- Buckets must be declared in `meta.json` before use (enforced)
+
+### meta.json — Database Metadata
+
+Separate JSON file that defines the database's configuration and display hints.
+
+```json
+{
+  "version": 2,
+  "created": 1743235200000,
+  "modified": 1743235200000,
+  "display": {
+    "title": "name.common",
+    "content": null,
+    "icon": "flag"
+  },
+  "buckets": ["attachments", "thumbnails"]
+}
+```
+
+**Fields:**
+- `version` — Schema version (currently 2)
+- `created` — Database creation timestamp (Unix epoch ms)
+- `modified` — Last modification timestamp (Unix epoch ms)
+- `display.title` — Dot-notation path to the field for display title (optional)
+- `display.content` — Dot-notation path to the field for content preview (optional)
+- `display.icon` — Dot-notation path to the field for icon/emoji (optional)
+- `buckets` — List of declared bucket names. **Enforced**: nDB rejects operations on undeclared buckets
+
+**Why separate file (not inline in JSONL):**
+- Data file (`db.jsonl`) stays a pure append-only log — no special first-line handling
+- Metadata is configuration, not data — different lifecycle
+- Admin can update display mappings without touching the data file
+- `wc -l` on `db.jsonl` gives exact document count, no off-by-one
+- Folder is the atomic unit — copy the folder, you have everything
+
+### Document Schema — System Fields
+
+Every document has these system-managed fields (prefixed with `_`):
+
+```json
+{
+  "_id": "V1StGXR8Z5jdHi6B",
+  "_created": 1743235200000,
+  "_modified": 1743235200000,
+  "name": {"common": "Aruba", "official": "Aruba"},
+  "flag": "🇦🇼"
+}
+```
+
+| Field | Type | Set by | Description |
+|-------|------|--------|-------------|
+| `_id` | string | nDB core | 16-char NanoID (base62), generated on insert |
+| `_created` | number | nDB core | Unix epoch ms, set once on insert, never modified |
+| `_modified` | number | nDB core | Unix epoch ms, set on insert, updated on every update |
+| `_deleted` | number | nDB core | Unix epoch ms, set on soft delete (only present on deleted docs) |
+
+**Rules:**
+- System fields are managed by nDB core — users cannot set or modify them
+- `_created` and `_modified` are always present on active documents
+- `_deleted` only appears on soft-deleted documents in `trash.jsonl`
+- User data must not use the `_` prefix for their own top-level fields
+
+### JSON Lines (NDJSON) — Data Files
+
+Each line in `db.jsonl` is one complete JSON object. Append-only. **No binary data inside.**
+
+```jsonl
+{"_id":"V1StGXR8Z5jdHi6B","_created":1743235200000,"_modified":1743235200000,"title":"AI Discussion","attachments":[{"_file":{"bucket":"attachments","id":"a3f5c2d1","ext":"png","name":"screenshot.png","size":45678,"type":"image/png"}}]}
+```
+
+Deleted documents are appended to `trash.jsonl`:
+```jsonl
+{"_id":"V1StGXR8Z5jdHi6B","_created":1743235200000,"_modified":1743235200000,"_deleted":1743235300000,"title":"AI Discussion"}
+```
 
 **Why this format:**
-- Human readable: `cat data.db | jq '.attachments[].name'`
+- Human readable: `cat db.jsonl | jq '.title'`
 - Streamable: Process TB without loading into memory
 - Append-only: O(1) writes, no corruption on crash
 - Git-friendly: Line-by-line diffs
@@ -153,16 +246,19 @@ File metadata lives in the document; only the content is external.
 
 Binaries are stored as files in folders. The database manages references; the filesystem stores bytes.
 
+**Buckets must be declared** in `meta.json` before use. nDB rejects operations on undeclared buckets. This prevents typo-based duplicate buckets (e.g., `attachements` vs `attachments`).
+
+```json
+// meta.json
+{
+  "buckets": ["attachments", "thumbnails"]
+}
 ```
-my-database/
-├── active/
-│   ├── conversations.jsonl      # Documents with file references
-│   └── _files/                  # Default bucket
-│       ├── a3f5c2d1.png         # hash.ext format
-│       ├── b7e9a4f2.jpg
-│       └── thumbnails/          # Named buckets
-│           ├── a3f5c2d1_128x128.png
-│           └── a3f5c2d1_256x256.png
+
+```rust
+// Bucket must exist in meta.json, otherwise this returns an error
+let bucket = db.bucket("attachments")?;   // OK — declared
+let bucket = db.bucket("attachements")?;  // ERROR — not declared
 ```
 
 **File naming:** SHA-256 hash (first 8 chars) + original extension
@@ -172,41 +268,49 @@ my-database/
 - Full hash stored in index for integrity verification
 
 **Trash handling (Per-Bucket):**
-Because files are stored by their content hash, file deduplication happens naturally. To avoid complex state-tracking on soft-deletes, *each bucket maintains its own trash folder*.
+Because files are stored by their content hash, file deduplication happens naturally. Each bucket maintains its own `_trash` folder (underscore prefix keeps it hidden from normal listing).
 
 ```text
-my-database/
-├── active/
-│   ├── conversations.jsonl
-│   └── _files/
-│       ├── a3f5c2d1.png
-│       └── trash/
-│           └── a3f5c2d1.png    # Moved/copied here on deletion
+countries/
+  buckets/
+    attachments/
+      a3f5c2d1.png
+      _trash/
+        b7e9a4f2.jpg              # Moved/copied here on deletion
+    thumbnails/
+      a3f5c2d1_128x128.png
+      _trash/
 ```
 
 *Note on hash collisions in trash:* If identically hashed files are moved to the same bucket's trash folder, overwriting the existing file is completely acceptable. The byte content is exactly the same by definition, eliminating the need for complex reference-counting or file tracking.
 
 ### Compaction & Document Trash
 
-Nothing is ever truly deleted.
+Nothing is ever truly deleted. Soft-deleted documents live in `trash.jsonl` alongside the active `db.jsonl`.
 
 ```text
-data/
-  conversations.jsonl           # Active documents
-  trash/
-    conversations_2026-03-26.jsonl   # Archived tombstones
+countries/
+  db.jsonl                      # Active documents
+  trash.jsonl                   # Soft-deleted documents (append-only)
 ```
 
 On `compact()`:
-1. Rewrite main file without `_deleted` documents
-2. Append deleted documents to dated trash file
-3. Trash files optionally TTL after N days
+1. Rewrite `db.jsonl` — keep only active documents (those without `_deleted`)
+2. Rewrite `trash.jsonl` — keep only deleted documents within the retention window
+3. Atomic file swap for both files — no corruption on crash
 
 **Compaction Strategy:**
 Because nDB relies on append-only logs for speed, the `compact()` step is critical for preventing bloat. The compaction strategy is flexible depending on the database's deployment context:
 - **Embedded App (Small Data):** Run lazily on application startup/shutdown, or automatically when a file size threshold is reached.
 - **Service Environment (Drive-Based nGDB):** Run as a scheduled background job. The rewrite utilizes an atomic file-swap to ensure active reads and writes are not blocked.
 - **In-Memory Operations:** When running with an in-memory primary state, a very tight compaction schedule (e.g., every 60 seconds) is used to continuously flush and prune tombstones, keeping state footprint as small as possible.
+
+**Trash retention:**
+```rust
+TrashMode::Manual                              // Never auto-delete (default)
+TrashMode::TTL(Duration::from_hours(24 * 7))   // Auto-purge after 7 days
+TrashMode::Off                                 // Hard delete immediately (dangerous)
+```
 
 ## Architecture: Three Layers + File Buckets
 
@@ -240,7 +344,7 @@ Because nDB relies on append-only logs for speed, the `compact()` step is critic
 ### Layer 1: Core (The Fast Path)
 
 ```rust
-let db = Database::open("data.jsonl")?;
+let db = Database::open("countries")?;
 
 // WRITE - O(1), append-only
 db.insert(doc)?;                               // Returns generated _id
@@ -343,16 +447,16 @@ All data is **always in-memory**. The persistence model determines when data is 
 ```rust
 // Default: In-memory with lazy persistence
 // Data lives in RAM. Persisted to disk periodically or on explicit flush.
-let db = Database::open("data.jsonl")?;
+let db = Database::open("countries")?;
 
 // Immediate persistence
 // Every write is fsynced to disk before returning. Slower, no data loss on crash.
-let db = Database::open("data.jsonl")?
+let db = Database::open("countries")?
     .with_persistence(Persistence::Immediate);
 
 // Scheduled persistence
 // Flush to disk every N seconds. Good balance of speed and safety.
-let db = Database::open("data.jsonl")?
+let db = Database::open("countries")?
     .with_persistence(Persistence::Scheduled(Duration::from_secs(60)));
 
 // Pure in-memory (no disk file)
@@ -491,14 +595,14 @@ ipcMain.handle('db:get', (event, id) => db.get(id));
 
 ### Pattern 1: Write-Heavy Log
 ```rust
-let logs = Database::open("logs.jsonl")?;
+let logs = Database::open("logs")?;
 logs.insert(json!({"event": "click", "ts": now()}))?;  // O(1)
 // Never query, just append. Zero index memory.
 ```
 
 ### Pattern 2: User Lookup (one index)
 ```rust
-let users = Database::open("users.jsonl")?;
+let users = Database::open("users")?;
 users.create_index("email")?;
 users.find("email", "alice@example.com");  // O(1)
 ```
@@ -529,8 +633,8 @@ for doc in db.iter() {
 
 ### Pattern 5: Documents with Attachments
 ```rust
-let db = Database::open("conversations.jsonl")?;
-let files = db.bucket("attachments");  // Default file bucket
+let db = Database::open("conversations")?;
+let files = db.bucket("attachments");  // Must be declared in meta.json
 
 // Store uploaded image
 let image_data = fs::read("upload.png")?;
@@ -555,7 +659,7 @@ for attachment_hash in conv["attachments"].as_array().unwrap() {
 
 ### Pattern 6: Multiple Buckets
 ```rust
-let db = Database::open("app.jsonl")?;
+let db = Database::open("app")?;
 
 // Different buckets for different purposes
 let avatars = db.bucket("avatars");      // User profile pictures
@@ -589,41 +693,39 @@ assert_eq!(ref1.hash, ref2.hash);  // Same underlying file
 
 ## File Layout
 
+Each database is a **folder**. The folder name IS the database name. Inside: metadata, data, trash, and bucket folders.
+
 ```
-my-database/
-├── active/
-│   ├── conversations.jsonl
-│   ├── arena-sessions.jsonl
-│   └── mcp-memory.jsonl
-├── _files/                           # Active file buckets
-│   ├── a3f5c2d1.png                  # Default bucket
-│   ├── b7e9a4f2.jpg
-│   └── avatars/                      # Named bucket
-│       └── user_123.png
-├── _trash/                           # Trash (documents + files)
-│   ├── docs/
-│   │   └── conversations_2026-03-26.jsonl
-│   └── files/                        # Trashed files by bucket
-│       ├── a3f5c2d1.png              # From default bucket
-│       └── avatars/
-│           └── c9d1e3f5.png
-├── indexes/                          # Optional persisted indexes
-│   ├── conversations_user_id.idx
-│   └── conversations_created.idx
+countries/                          ← Database folder = database name
+├── meta.json                       ← Database metadata (version, display, buckets)
+├── db.jsonl                        ← Active documents (pure append-only)
+├── trash.jsonl                     ← Soft-deleted documents
+├── buckets/                        ← Binary file storage
+│   ├── attachments/
+│   │   ├── a3f5c2d1.png            ← hash.ext format
+│   │   └── _trash/                 ← Per-bucket trash for deleted files
+│   │       └── b7e9a4f2.jpg
+│   └── thumbnails/
+│       ├── a3f5c2d1_128x128.png
+│       └── _trash/
+└── indexes/                        ← Optional persisted indexes
+    ├── user_id.idx
+    └── created.idx
 ```
+
+**Key rules:**
+- Database name = folder name — no indirection
+- `db.jsonl` — standardized name, pure append-only log, no metadata line
+- `trash.jsonl` — single file for all soft-deleted documents
+- `buckets/` — binary storage, each bucket is a subfolder
+- `_trash/` inside each bucket — deleted files (underscore prefix = hidden)
+- Buckets must be declared in `meta.json` before use (enforced)
 
 **Trash behavior:**
-- `bucket.delete()` → moves file to `_trash/files/{bucket}/`
-- `db.delete()` → moves doc to `_trash/docs/`, referenced files to `_trash/files/`
-- `file_trash().restore(hash)` → moves back to original bucket
-- `file_trash().purge(older_than)` → permanent deletion
-
-**Configuration:**
-```rust
-TrashMode::Manual                              // Never auto-delete (default)
-TrashMode::TTL(Duration::from_hours(24 * 7))   // Auto-purge after 7 days
-TrashMode::Off                                 // Hard delete immediately (dangerous)
-```
+- `bucket.delete()` → moves file to `buckets/{bucket}/_trash/`
+- `db.delete()` → appends doc to `trash.jsonl`, optionally moves referenced files to bucket trash
+- `trash().restore(id)` → moves doc back to `db.jsonl`
+- `trash().purge(older_than)` → permanent deletion from `trash.jsonl`
 
 ## API Reference
 
@@ -668,7 +770,7 @@ TrashMode::Off                                 // Hard delete immediately (dange
 
 | Method | Complexity | Description |
 |--------|-----------|-------------|
-| `bucket(name)` | O(1) | Get or create named bucket |
+| `bucket(name)` | O(1) | Get named bucket (must be declared in meta.json) |
 | `bucket.store(name, &[u8])` | O(1) | Store file, returns `FileMeta` |
 | `bucket.get(&FileRef)` | O(1) | Read file bytes |
 | `bucket.exists(hash)` | O(1) | Check if file exists |
@@ -720,7 +822,7 @@ pub struct FileRef {
 
 // Disk path construction
 // bucket="attachments", id="a3f5c2d1", ext="png"
-// → my-database/_files/attachments/a3f5c2d1.png
+// → countries/buckets/attachments/a3f5c2d1.png
 ```
 
 **JSON in document:**
@@ -799,11 +901,20 @@ npm install ndb   # or nvdb
 
 ```rust
 pub struct Database {
-    path: PathBuf,
-    docs: RwLock<HashMap<String, Value>>,       // _id → document (in-memory)
-    indexes: HashMap<String, Box<dyn Index>>,   // opt-in secondary indexes
-    writer: Mutex<()>,                          // single-writer lock
-    persistence: Persistence,                   // when to flush to disk
+    // Folder-based paths
+    db_path: PathBuf,                            // Database folder (e.g. "countries/")
+    meta_path: PathBuf,                          // meta.json inside folder
+    data_path: PathBuf,                          // db.jsonl inside folder
+    trash_path: PathBuf,                         // trash.jsonl inside folder
+
+    // In-memory state
+    docs: RwLock<HashMap<String, Value>>,        // _id → document (in-memory)
+    deleted: RwLock<HashSet<String>>,            // Soft-deleted _id set
+    indexes: RwLock<HashMap<String, Box<dyn Index>>>, // opt-in secondary indexes
+    writer: Mutex<()>,                           // single-writer lock
+    persistence: Persistence,                    // when to flush to disk
+    trash_mode: TrashMode,                       // trash retention policy
+    file_handle: Mutex<Option<fs::File>>,        // append handle for db.jsonl
 }
 
 pub trait Index {
@@ -830,14 +941,15 @@ fn generate_id() -> String {
 
 ### Compaction Strategy
 
-1. Read through file sequentially
+1. Read through `db.jsonl` sequentially
 2. Skip documents where `_deleted` is set
-3. Rewrite active documents to `data.jsonl.tmp`
-4. Append deleted documents to `trash/data_YYYY-MM-DD.jsonl`
-5. Atomic rename `tmp` → `data.jsonl`
-6. Rebuild in-memory index from new file
+3. Rewrite active documents to `db.jsonl.tmp`
+4. Atomic rename `tmp` → `db.jsonl`
+5. Read through `trash.jsonl`, keep only documents within retention window
+6. Rewrite to `trash.jsonl.tmp`, atomic rename
+7. Rebuild in-memory index from new `db.jsonl`
 
-Crash safety: Original file untouched until final rename.
+Crash safety: Original files untouched until final rename.
 
 ## Comparison
 
@@ -887,6 +999,11 @@ await ngdb.search('embeddings', { vector: q, k: 10 });   // → nVDB
 
 | Decision | Resolution |
 |----------|------------|
+| Storage format | Folder per database: `meta.json` + `db.jsonl` + `trash.jsonl` + `buckets/`. |
+| Metadata | Separate `meta.json` file — not inline in JSONL. Configuration, not data. |
+| System timestamps | `_created` and `_modified` injected by nDB core (Rust) on every insert/update. |
+| Display mappings | `display.title`, `display.content`, `display.icon` in `meta.json` for admin UI. |
+| Bucket enforcement | Buckets must be declared in `meta.json` before use. nDB rejects undeclared buckets. |
 | Trash behavior | Soft delete for both docs and files. Manual or TTL cleanup. |
 | File storage | Hashed filenames in buckets. Original name in document metadata. |
 | Binary handling | Files stored on disk, only references (`_file` objects) in JSON. |
@@ -898,6 +1015,7 @@ await ngdb.search('embeddings', { vector: q, k: 10 });   // → nVDB
 | N-API approach | Direct napi-rs per package (no shared nBridge module). |
 | Ecosystem position | nDB = document backend, nVDB = vector backend, nGDB = service platform. |
 | JS runtime | Vanilla JavaScript. `.d.ts` for LLM/editor hints only. |
+| Migration path | Manual edit — simple file format, restructure by hand. |
 
 ## Next Steps
 

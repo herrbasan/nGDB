@@ -8,27 +8,34 @@
 
 | Document | Description | Status |
 |----------|-------------|--------|
-| [nGDB Spec](./nGDB-spec.md) | Service wrapper architecture (proxy design) | 📝 Draft |
+| [nGDB Spec](./nGDB-spec.md) | Service wrapper architecture, proxy routes, WebSocket protocol | ✅ Current |
 | [nDB Spec](./nDB-spec.md) | Document database (JSON Lines) | 📝 Draft |
-| nVDB Spec | Vector database (HNSW) | ✅ Complete (reference) |
+| nVDB Spec | Vector database (HNSW) | ✅ Complete (in nvdb repo) |
 
 ### Development Plans (Execution Roadmaps)
 
 | Document | Phases | Current Phase |
 |----------|--------|---------------|
-| [nGDB Development Plan](./nGDB-development-plan.md) | 6 phases | Not started |
-| [nDB Development Plan](./nDB-development-plan.md) | 6 phases | Not started |
+| [nGDB Development Plan](./nGDB-development-plan.md) | 6 phases | Phase 5 complete |
+| [nDB Development Plan](./nDB-development-plan.md) | 6 phases | Complete |
 
 ## Project Structure
 
 ```
 nGDB/                          <- This repository (service wrapper)
+├── src/                       <- nGDB service layer
+│   ├── server.js              <- HTTP server entry point
+│   ├── config.js              <- Environment-driven configuration
+│   ├── middleware/             <- Auth, tenancy
+│   ├── handlers/              <- Transport-agnostic proxy handlers
+│   │   ├── db.js              <- nDB proxy (26 routes)
+│   │   └── vdb.js             <- nVDB proxy (16 routes)
+│   ├── transports/            <- Transport adapters
+│   │   ├── http.js            <- HTTP request/response adapter
+│   │   └── ws.js              <- WebSocket frame protocol (RFC 6455)
+│   └── ws.js                  <- WebSocket server, subscriptions, broadcast
+├── tests/                     <- Integration tests (phases 1-5)
 ├── docs/                      <- Documentation (you are here)
-│   ├── README.md              <- This file
-│   ├── nGDB-spec.md           <- Service wrapper spec
-│   ├── nDB-spec.md            <- Document database spec
-│   ├── nGDB-development-plan.md
-│   └── nDB-development-plan.md
 ├── ndb/                       <- Git submodule (independent project)
 └── nvdb/                      <- Git submodule (independent project)
 ```
@@ -64,7 +71,7 @@ HTTP and WebSocket share the same handler code — the proxy logic is transport-
 
 | Repository | Purpose | Contains |
 |------------|---------|----------|
-| [herrbasan/nGDB](https://github.com/herrbasan/nGDB) | Service wrapper | This repo - docs, submodules, service layer |
+| [herrbasan/nGDB](https://github.com/herrbasan/nGDB) | Service wrapper | This repo — service layer, docs, submodules |
 | [herrbasan/nDB](https://github.com/herrbasan/nDB) | Document database | Rust core + N-API bindings (independent project) |
 | [herrbasan/nVDB](https://github.com/herrbasan/nVDB) | Vector database | Rust core + N-API bindings (independent project) |
 
@@ -78,38 +85,63 @@ nGDB/                          <- Service wrapper
 
 ## Current Status
 
-- ✅ **Specifications** - All drafted and ready for reference
-- ✅ **Repository structure** - Submodules imported
-- ⏳ **nDB** - Ready to implement core and internal N-API
-- ⏳ **nGDB** - Ready to scaffold service wrapper
-- ✅ **nVDB** - Complete reference implementation
+- ✅ **nGDB Phases 1-5** — HTTP server, nDB proxy, nVDB proxy, WebSocket, auth, tenancy
+- ✅ **nDB** — Document database with queries, indexes, file buckets
+- ✅ **nVDB** — Vector database with HNSW, SIMD, filter DSL
+- ⏳ **Phase 6** — Client SDKs and tooling (not started)
 
 ## Getting Started
+
+### Running nGDB
+
+```bash
+# Clone with submodules
+git clone --recursive https://github.com/herrbasan/nGDB.git
+cd nGDB
+
+# Install dependencies
+npm install
+
+# Start the server
+npm start
+
+# Test
+curl http://localhost:3000/health
+```
+
+### Configuration
+
+All config via environment variables:
+
+```bash
+PORT=3000                       # HTTP port (default: 3000)
+HOST=0.0.0.0                    # Bind address
+NDB_DATA_DIR=./data/ndb         # nDB storage root
+NVDB_DATA_DIR=./data/nvdb       # nVDB storage root
+API_KEYS=key1,key2              # Auth keys (empty = disabled)
+LOCAL_AUTH_BYPASS=true          # Private IPs skip auth (default: true)
+TENANT_HEADER=x-tenant-id       # Multi-tenancy header (empty = disabled)
+```
 
 ### For nDB Development
 
 1. Reference: [nDB-spec.md](./nDB-spec.md)
 2. Plan: [nDB-development-plan.md](./nDB-development-plan.md)
-3. Location: `ndb/` (currently empty)
-4. Steps:
-   - Implement Rust core (Phases 1-4)
-   - Build internal N-API layer (Phase 5)
+3. Location: `ndb/` (git submodule)
 
 ### For nGDB Development
 
 1. Reference: [nGDB-spec.md](./nGDB-spec.md)
 2. Plan: [nGDB-development-plan.md](./nGDB-development-plan.md)
-3. Location: `src/` (create here)
-4. Depends on: nDB Phase 2+ for API integration
+3. Location: `src/`
 
 ## Development Workflow
 
-1. **Reference the specs** - Implementation details are in the spec documents
-2. **Follow the dev plans** - Phased approach with clear deliverables
-3. **Internal N-API** - Implement Node.js bindings tightly coupled inside each Rust backend
-4. **Test integration in nGDB** - All modules together for end-to-end testing
-5. **Publish independently** - Stable modules released to npm as standalone packages
+1. **Reference the specs** — Implementation details are in the spec documents
+2. **Follow the dev plans** — Phased approach with clear deliverables
+3. **Test integration in nGDB** — All modules together for end-to-end testing
+4. **Publish independently** — Stable modules released to npm as standalone packages
 
 ---
 
-*Last updated: 2026-03-27*
+*Last updated: 2026-03-28*

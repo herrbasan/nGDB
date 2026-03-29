@@ -4,3 +4,6 @@
 [submodule "nvdb"]
 	path = nvdb
 	url = https://github.com/herrbasan/nVDB.git
+[submodule "admin/NUI"]
+	path = admin/NUI
+	url = https://github.com/herrbasan/nui_wc2.git

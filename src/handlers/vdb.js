@@ -184,4 +184,4 @@ const handlers = {
   hasIndex,
 };
 
-module.exports = { handlers, instances };
+module.exports = { handlers, instances, collectionCache };

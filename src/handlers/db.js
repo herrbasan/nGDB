@@ -8,6 +8,7 @@ const path = require('path');
 const { ndbDataDir } = require('../middleware/tenancy');
 
 // Open database instances by handle ID
+// Map stores { db, path } objects so admin UI can retrieve the path
 const instances = new Map();
 
 function open(params, ctx) {
@@ -17,174 +18,200 @@ function open(params, ctx) {
   const options = params.options;
   const db = options ? Database.open(dbPath, options) : Database.open(dbPath);
   const handle = randomUUID();
-  instances.set(handle, db);
+  instances.set(handle, { db, path: dbPath });
   return { handle };
 }
 
 function close(params, ctx) {
   const handle = params.handle;
-  const db = instances.get(handle);
-  db.flush();
+  const entry = instances.get(handle);
+  if (!entry) throw new Error(`nDB instance not found: ${handle}`);
+  entry.db.flush();
   instances.delete(handle);
   return { ok: true };
 }
 
 function insert(params, ctx) {
-  const db = instances.get(params.handle);
-  const id = db.insert(params.doc);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const id = entry.db.insert(params.doc);
   return { id };
 }
 
 function get(params, ctx) {
-  const db = instances.get(params.handle);
-  const doc = db.get(params.id);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const doc = entry.db.get(params.id);
   return { doc };
 }
 
 function update(params, ctx) {
-  const db = instances.get(params.handle);
-  db.update(params.id, params.doc);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  entry.db.update(params.id, params.doc);
   return { ok: true };
 }
 
 function delete_(params, ctx) {
-  const db = instances.get(params.handle);
-  db.delete(params.id);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  entry.db.delete(params.id);
   return { ok: true };
 }
 
 function query(params, ctx) {
-  const db = instances.get(params.handle);
-  const results = db.query(params.ast);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const results = entry.db.query(params.ast);
   return { results };
 }
 
 function queryWith(params, ctx) {
-  const db = instances.get(params.handle);
-  const results = db.queryWith(params.ast, params.options);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const results = entry.db.queryWith(params.ast, params.options);
   return { results };
 }
 
 function find(params, ctx) {
-  const db = instances.get(params.handle);
-  const results = db.find(params.field, params.value);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const results = entry.db.find(params.field, params.value);
   return { results };
 }
 
 function findRange(params, ctx) {
-  const db = instances.get(params.handle);
-  const results = db.findRange(params.field, params.min, params.max);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const results = entry.db.findRange(params.field, params.min, params.max);
   return { results };
 }
 
 function iter(params, ctx) {
-  const db = instances.get(params.handle);
-  const docs = db.iter();
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const docs = entry.db.iter();
   return { docs };
 }
 
 function len(params, ctx) {
-  const db = instances.get(params.handle);
-  const count = db.len();
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const count = entry.db.len();
   return { count };
 }
 
 function contains(params, ctx) {
-  const db = instances.get(params.handle);
-  const exists = db.contains(params.id);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const exists = entry.db.contains(params.id);
   return { exists };
 }
 
 function createIndex(params, ctx) {
-  const db = instances.get(params.handle);
-  db.createIndex(params.field);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  entry.db.createIndex(params.field);
   return { ok: true };
 }
 
 function dropIndex(params, ctx) {
-  const db = instances.get(params.handle);
-  db.dropIndex(params.field);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  entry.db.dropIndex(params.field);
   return { ok: true };
 }
 
 function flush(params, ctx) {
-  const db = instances.get(params.handle);
-  db.flush();
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  entry.db.flush();
   return { ok: true };
 }
 
 function insertWithPrefix(params, ctx) {
-  const db = instances.get(params.handle);
-  const id = db.insertWithPrefix(params.prefix, params.doc);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const id = entry.db.insertWithPrefix(params.prefix, params.doc);
   return { id };
 }
 
 function openInMemory(params, ctx) {
   const db = Database.openInMemory();
   const handle = randomUUID();
-  instances.set(handle, db);
+  instances.set(handle, { db, path: ':memory:' });
   return { handle };
 }
 
 function isEmpty(params, ctx) {
-  const db = instances.get(params.handle);
-  const empty = db.isEmpty();
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const empty = entry.db.isEmpty();
   return { empty };
 }
 
 function createBTreeIndex(params, ctx) {
-  const db = instances.get(params.handle);
-  db.createBTreeIndex(params.field);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  entry.db.createBTreeIndex(params.field);
   return { ok: true };
 }
 
 function hasIndex(params, ctx) {
-  const db = instances.get(params.handle);
-  const exists = db.hasIndex(params.field);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const exists = entry.db.hasIndex(params.field);
   return { exists };
 }
 
 function compact(params, ctx) {
-  const db = instances.get(params.handle);
-  db.compact();
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  entry.db.compact();
   return { ok: true };
 }
 
 function restore(params, ctx) {
-  const db = instances.get(params.handle);
-  db.restore(params.id);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  entry.db.restore(params.id);
   return { ok: true };
 }
 
 function deletedIds(params, ctx) {
-  const db = instances.get(params.handle);
-  const ids = db.deletedIds();
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const ids = entry.db.deletedIds();
   return { ids };
 }
 
 // ─── File Bucket Handlers ──────────────────────────────────────────
 
 function storeFile(params, ctx) {
-  const db = instances.get(params.handle);
-  const meta = db.storeFile(params.bucket, params.name, Buffer.from(params.data, 'base64'), params.mimeType);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const meta = entry.db.storeFile(params.bucket, params.name, Buffer.from(params.data, 'base64'), params.mimeType);
   return { meta };
 }
 
 function getFile(params, ctx) {
-  const db = instances.get(params.handle);
-  const data = db.getFile(params.bucket, params.hash, params.ext);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const data = entry.db.getFile(params.bucket, params.hash, params.ext);
   return { data: data.toString('base64') };
 }
 
 function deleteFile(params, ctx) {
-  const db = instances.get(params.handle);
-  db.deleteFile(params.bucket, params.hash, params.ext);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  entry.db.deleteFile(params.bucket, params.hash, params.ext);
   return { ok: true };
 }
 
 function listFiles(params, ctx) {
-  const db = instances.get(params.handle);
-  const files = db.listFiles(params.bucket);
+  const entry = instances.get(params.handle);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
+  const files = entry.db.listFiles(params.bucket);
   return { files };
 }
 

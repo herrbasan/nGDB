@@ -1,0 +1,167 @@
+<div class="page-dashboard">
+	<header>
+		<h1>Dashboard</h1>
+		<p class="lead">nGDB service overview and health status</p>
+	</header>
+
+	<section>
+		<nui-layout columns="4" gap="1rem">
+			<nui-card>
+				<div class="stat-card">
+					<div>
+						<h3>Service Status</h3>
+						<p id="serviceStatus">Loading...</p>
+					</div>
+				</div>
+			</nui-card>
+			<nui-card>
+				<div class="stat-card">
+					<div>
+						<h3>nDB Instances</h3>
+						<p id="ndbCount">—</p>
+					</div>
+				</div>
+			</nui-card>
+			<nui-card>
+				<div class="stat-card">
+					<div>
+						<h3>nVDB Instances</h3>
+						<p id="nvdbCount">—</p>
+					</div>
+				</div>
+			</nui-card>
+			<nui-card>
+				<div class="stat-card">
+					<div>
+						<h3>Connections</h3>
+						<p id="wsConnections">—</p>
+					</div>
+				</div>
+			</nui-card>
+		</nui-layout>
+	</section>
+
+	<section>
+		<h2>Quick Actions</h2>
+		<nui-button-container>
+			<nui-button data-action="open-ndb">
+				<button type="button">Open nDB Database</button>
+			</nui-button>
+			<nui-button data-action="open-nvdb">
+				<button type="button">Open nVDB Database</button>
+			</nui-button>
+		</nui-button-container>
+	</section>
+
+	<section>
+		<h2>Service Info</h2>
+		<nui-accordion>
+			<details open>
+				<summary>Backends</summary>
+				<div id="backendInfo">Loading...</div>
+			</details>
+			<details>
+				<summary>WebSocket Subscriptions</summary>
+				<div id="subscriptionInfo">Loading...</div>
+			</details>
+		</nui-accordion>
+	</section>
+</div>
+
+<style>
+	.stat-card h3 { margin: 0 0 0.25rem; font-size: 0.875rem; }
+	.stat-card p { margin: 0; font-size: 1.5rem; font-weight: 600; }
+</style>
+
+<script type="nui/page">
+function init(element, params, nui) {
+	nui = window.nui;
+	const { api } = window.ngdb;
+	let refreshTimer = null;
+
+	async function loadDashboard() {
+		try {
+			const status = await api('/status');
+
+			element.querySelector('#serviceStatus').textContent = status.status || 'Unknown';
+			element.querySelector('#ndbCount').textContent = status.backends?.ndbInstances ?? '—';
+			element.querySelector('#nvdbCount').textContent = status.backends?.nvdbInstances ?? '—';
+			element.querySelector('#wsConnections').textContent = status.connections ?? '—';
+
+			const backendInfo = element.querySelector('#backendInfo');
+			backendInfo.innerHTML = '<p>nDB: <nui-badge variant="success">' +
+				(status.backends?.ndb || 'unknown') +
+				'</nui-badge></p><p>nVDB: <nui-badge variant="success">' +
+				(status.backends?.nvdb || 'unknown') +
+				'</nui-badge></p><p>Uptime: ' +
+				Math.floor((status.uptime || 0) / 60) + ' min</p>';
+
+			const subInfo = element.querySelector('#subscriptionInfo');
+			const subs = status.subscriptions || 0;
+			const collections = status.collections || [];
+			subInfo.innerHTML = '<p>Active subscriptions: <strong>' + subs +
+				'</strong></p><p>Watched collections: ' +
+				(collections.length > 0 ? collections.join(', ') : 'none') + '</p>';
+		} catch (err) {
+			element.querySelector('#serviceStatus').textContent = 'Error: ' + err.message;
+		}
+	}
+
+	loadDashboard();
+
+	// Quick action handlers
+	element.addEventListener('click', async (e) => {
+		const action = e.target.closest('[data-action]')?.dataset.action;
+		if (!action) return;
+
+		if (action === 'open-ndb') {
+			const result = await nui.components.dialog.prompt('Open nDB Database', 'Enter database path:', {
+				fields: [{ id: 'path', label: 'Path', value: 'mydb' }]
+			});
+			if (result && result.path) {
+				try {
+					await api('/ndb/instances', { method: 'POST', body: JSON.stringify({ path: result.path }) });
+					nui.components.banner.show({ content: 'Opened nDB: ' + result.path, priority: 'success', autoClose: 3000 });
+					loadDashboard();
+				} catch (err) {
+					nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
+				}
+			}
+		}
+
+		if (action === 'open-nvdb') {
+			const result = await nui.components.dialog.prompt('Open nVDB Database', 'Enter database path:', {
+				fields: [{ id: 'path', label: 'Path', value: 'myvdb' }]
+			});
+			if (result && result.path) {
+				try {
+					await api('/nvdb/instances', { method: 'POST', body: JSON.stringify({ path: result.path }) });
+					nui.components.banner.show({ content: 'Opened nVDB: ' + result.path, priority: 'success', autoClose: 3000 });
+					loadDashboard();
+				} catch (err) {
+					nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
+				}
+			}
+		}
+	});
+
+	// Auto-refresh every 10s
+	refreshTimer = setInterval(loadDashboard, 10000);
+
+	// Lifecycle: pause polling when page is hidden
+	element.hide = () => {
+		if (refreshTimer) {
+			clearInterval(refreshTimer);
+			refreshTimer = null;
+		}
+	};
+
+	// Lifecycle: resume polling when page becomes visible
+	element.show = () => {
+		if (!refreshTimer) {
+			loadDashboard();
+			refreshTimer = setInterval(loadDashboard, 10000);
+		}
+	};
+}
+</script>

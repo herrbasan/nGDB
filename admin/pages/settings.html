@@ -1,0 +1,138 @@
+<div class="page-settings">
+	<header>
+		<h1>Settings</h1>
+		<p class="lead">nGDB service configuration overview</p>
+	</header>
+
+	<section>
+		<nui-accordion>
+			<details open>
+				<summary>Server Configuration</summary>
+				<div id="serverConfig">Loading...</div>
+			</details>
+			<details>
+				<summary>Authentication</summary>
+				<div id="authConfig">Loading...</div>
+			</details>
+			<details>
+				<summary>Data Directories</summary>
+				<div id="dataConfig">Loading...</div>
+			</details>
+			<details>
+				<summary>Multi-Tenancy</summary>
+				<div id="tenantConfig">Loading...</div>
+			</details>
+		</nui-accordion>
+	</section>
+
+	<section>
+		<h2>Service Actions</h2>
+		<nui-button-container>
+			<nui-button data-action="refresh-status">
+				<button type="button">Refresh Status</button>
+			</nui-button>
+		</nui-button-container>
+	</section>
+
+	<section>
+		<h2>Runtime Info</h2>
+		<nui-card>
+			<div id="runtimeInfo">Loading...</div>
+		</nui-card>
+	</section>
+</div>
+
+<style>
+	.config-table {
+		width: 100%;
+		border-collapse: collapse;
+	}
+	.config-table td {
+		padding: 0.5rem 1rem;
+		border-bottom: 1px solid var(--nui-border, #eee);
+	}
+	.config-table td:first-child {
+		font-weight: 600;
+		width: 200px;
+	}
+	.config-value {
+		font-family: monospace;
+	}
+</style>
+
+<script type="nui/page">
+function init(element, params, nui) {
+	nui = window.nui;
+	const { api } = window.ngdb;
+
+	async function loadSettings() {
+		try {
+			const status = await api('/status');
+
+			// Server config
+			element.querySelector('#serverConfig').innerHTML = `
+				<table class="config-table">
+					<tr><td>Status</td><td class="config-value"><nui-badge variant="success">${status.status}</nui-badge></td></tr>
+					<tr><td>Version</td><td class="config-value">${status.version || '—'}</td></tr>
+					<tr><td>Uptime</td><td class="config-value">${formatUptime(status.uptime || 0)}</td></tr>
+					<tr><td>Admin Enabled</td><td class="config-value">${status.config?.adminEnabled ? '<nui-badge variant="success">Yes</nui-badge>' : '<nui-badge>No</nui-badge>'}</td></tr>
+				</table>
+			`;
+
+			// Auth config
+			const hasKeys = status.config?.hasApiKeys;
+			element.querySelector('#authConfig').innerHTML = `
+				<table class="config-table">
+					<tr><td>Auth Enabled</td><td class="config-value">${hasKeys ? '<nui-badge variant="success">Yes</nui-badge>' : '<nui-badge variant="warning">No (open access)</nui-badge>'}</td></tr>
+					<tr><td>Local Bypass</td><td class="config-value">${status.config?.localAuthBypass ? 'Yes' : 'No'}</td></tr>
+				</table>
+			`;
+
+			// Data dirs
+			element.querySelector('#dataConfig').innerHTML = `
+				<table class="config-table">
+					<tr><td>nDB Data Dir</td><td class="config-value">${status.config?.ndbDataDir || './data/ndb'}</td></tr>
+					<tr><td>nVDB Data Dir</td><td class="config-value">${status.config?.nvdbDataDir || './data/nvdb'}</td></tr>
+				</table>
+			`;
+
+			// Tenancy
+			element.querySelector('#tenantConfig').innerHTML = `
+				<table class="config-table">
+					<tr><td>Tenancy</td><td class="config-value">${status.config?.tenantHeader ? '<nui-badge variant="info">Enabled</nui-badge> (header: ' + status.config.tenantHeader + ')' : '<nui-badge>Disabled</nui-badge>'}</td></tr>
+				</table>
+			`;
+
+			// Runtime info
+			element.querySelector('#runtimeInfo').innerHTML = `
+				<table class="config-table">
+					<tr><td>WebSocket Connections</td><td class="config-value">${status.connections || 0}</td></tr>
+					<tr><td>Active Subscriptions</td><td class="config-value">${status.subscriptions || 0}</td></tr>
+					<tr><td>nDB Instances</td><td class="config-value">${status.backends?.ndbInstances || 0}</td></tr>
+					<tr><td>nVDB Instances</td><td class="config-value">${status.backends?.nvdbInstances || 0}</td></tr>
+				</table>
+			`;
+		} catch (err) {
+			element.querySelector('#serverConfig').innerHTML = `<p>Error loading settings: ${err.message}</p>`;
+		}
+	}
+
+	function formatUptime(seconds) {
+		const hours = Math.floor(seconds / 3600);
+		const minutes = Math.floor((seconds % 3600) / 60);
+		const secs = Math.floor(seconds % 60);
+		if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
+		if (minutes > 0) return `${minutes}m ${secs}s`;
+		return `${secs}s`;
+	}
+
+	element.addEventListener('click', (e) => {
+		const action = e.target.closest('[data-action]')?.dataset.action;
+		if (action === 'refresh-status') {
+			loadSettings();
+		}
+	});
+
+	loadSettings();
+}
+</script>

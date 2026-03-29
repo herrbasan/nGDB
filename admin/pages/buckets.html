@@ -1,0 +1,203 @@
+<div class="page-buckets">
+	<header>
+		<h1>File Buckets</h1>
+		<p class="lead">Browse and manage file buckets in nDB instances</p>
+	</header>
+
+	<section>
+		<nui-input-group>
+			<label>Database Handle</label>
+			<nui-select id="bucketHandleSelect">
+				<select></select>
+			</nui-select>
+		</nui-input-group>
+	</section>
+
+	<section>
+		<nui-input-group>
+			<label>Bucket Name</label>
+			<nui-input id="bucketName">
+				<input type="text" placeholder="Enter bucket name...">
+			</nui-input>
+		</nui-input-group>
+		<nui-button-container>
+			<nui-button data-action="load-bucket">
+				<button type="button">Load Bucket</button>
+			</nui-button>
+			<nui-button data-action="upload-file">
+				<button type="button">Upload File</button>
+			</nui-button>
+		</nui-button-container>
+	</section>
+
+	<section class="list-container">
+		<nui-list id="fileList"></nui-list>
+	</section>
+</div>
+
+<style>
+	.list-container {
+		height: 400px;
+		overflow: hidden;
+	}
+	.file-list-item {
+		display: grid;
+		grid-template-columns: 60px 1fr 120px 100px 80px;
+		gap: 0.5rem;
+		padding: 0.5rem;
+		align-items: center;
+	}
+	.file-list-item:hover {
+		background: var(--nui-hover, rgba(0,0,0,0.04));
+	}
+	.file-icon {
+		text-align: center;
+	}
+	.file-meta {
+		font-size: 0.85rem;
+		color: var(--nui-muted, #666);
+	}
+</style>
+
+<script type="nui/page">
+function init(element, params, nui) {
+	nui = window.nui;
+	const { api } = window.ngdb;
+	const { fromHTML } = nui.util.dom;
+
+	let currentHandle = null;
+	let currentBucket = null;
+
+	const handleSelect = element.querySelector('#bucketHandleSelect');
+	const bucketNameInput = element.querySelector('#bucketName input');
+	const fileList = element.querySelector('#fileList');
+
+	async function loadHandles() {
+		try {
+			const result = await api('/ndb/instances');
+			const instances = result.instances || [];
+			handleSelect.setItems(instances.map(inst => ({
+				value: inst.handle,
+				label: inst.handle.substring(0, 8) + '…'
+			})));
+		} catch (err) {
+			nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
+		}
+	}
+
+	async function loadBucketFiles() {
+		currentHandle = handleSelect.getValue();
+		currentBucket = bucketNameInput ? bucketNameInput.value.trim() : '';
+		if (!currentHandle || !currentBucket) {
+			nui.components.banner.show({ content: 'Select a database and enter bucket name', priority: 'warning' });
+			return;
+		}
+
+		try {
+			const result = await api('/ndb/instances/' + currentHandle + '/buckets/' + currentBucket + '/files');
+			const files = result.files || [];
+
+			fileList.loadData({
+				data: files,
+				render: (item) => {
+					return fromHTML(
+						'<div class="file-list-item">' +
+							'<div class="file-icon">📄</div>' +
+							'<div>' +
+								'<div>' + item.name + '</div>' +
+								'<div class="file-meta">' + item.hash + (item.ext ? '.' + item.ext : '') + '</div>' +
+							'</div>' +
+							'<div>' + (item.mimeType || '—') + '</div>' +
+							'<div>' + (item.size ? (item.size / 1024).toFixed(1) + ' KB' : '—') + '</div>' +
+							'<div>' +
+								'<nui-button data-action="delete-file" data-hash="' + item.hash + '" data-ext="' + (item.ext || '') + '">' +
+									'<button type="button">Delete</button>' +
+								'</nui-button>' +
+							'</div>' +
+						'</div>'
+					);
+				},
+				search: [{ prop: 'name' }, { prop: 'mimeType' }],
+				sort: [
+					{ label: 'Name', prop: 'name' },
+					{ label: 'Type', prop: 'mimeType' },
+				],
+				footer: {
+					buttons_right: [
+						{
+							label: 'Total: ' + files.length + ' files',
+							type: 'outline',
+							fnc: function() {},
+						},
+					],
+				},
+			});
+		} catch (err) {
+			nui.components.banner.show({ content: 'Error loading files: ' + err.message, priority: 'danger' });
+		}
+	}
+
+	element.addEventListener('click', async (e) => {
+		const actionEl = e.target.closest('[data-action]');
+		if (!actionEl) return;
+		const action = actionEl.dataset.action;
+
+		if (action === 'load-bucket') {
+			loadBucketFiles();
+		}
+
+		if (action === 'upload-file') {
+			if (!currentHandle || !currentBucket) {
+				nui.components.banner.show({ content: 'Select database and bucket first', priority: 'warning' });
+				return;
+			}
+			var nameResult = await nui.components.dialog.prompt('Upload File', 'File name:', {
+				fields: [{ id: 'name', label: 'File Name', value: 'test.txt' }]
+			});
+			if (nameResult && nameResult.name) {
+				var contentResult = await nui.components.dialog.prompt('File Content', 'Base64-encoded content:', {
+					fields: [{ id: 'content', label: 'Content (Base64)', value: '' }]
+				});
+				if (contentResult && contentResult.content) {
+					try {
+						await api('/ndb/instances/' + currentHandle + '/buckets/' + currentBucket + '/store', {
+							method: 'POST',
+							body: JSON.stringify({
+								name: nameResult.name,
+								data: contentResult.content,
+								mimeType: 'application/octet-stream',
+							}),
+						});
+						nui.components.banner.show({ content: 'Uploaded: ' + nameResult.name, priority: 'success', autoClose: 3000 });
+						loadBucketFiles();
+					} catch (err) {
+						nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
+					}
+				}
+			}
+		}
+
+		if (action === 'delete-file') {
+			var hash = actionEl.dataset.hash;
+			var ext = actionEl.dataset.ext;
+			if (!currentHandle || !currentBucket) return;
+
+			var confirmed = await nui.components.dialog.confirm('Delete File', 'Delete file ' + hash + (ext ? '.' + ext : '') + '?');
+			if (confirmed) {
+				try {
+					await api('/ndb/instances/' + currentHandle + '/buckets/' + currentBucket + '/delete', {
+						method: 'POST',
+						body: JSON.stringify({ hash: hash, ext: ext }),
+					});
+					nui.components.banner.show({ content: 'Deleted', priority: 'success', autoClose: 2000 });
+					loadBucketFiles();
+				} catch (err) {
+					nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
+				}
+			}
+		}
+	});
+
+	loadHandles();
+}
+</script>

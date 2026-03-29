@@ -19,6 +19,12 @@ const config = {
   // If set, each tenant gets isolated data paths under the data dirs.
   // Example: TENANT_HEADER=x-tenant-id
   tenantHeader: process.env.TENANT_HEADER || '',
+
+  // Admin web interface: enabled by default, disable with ADMIN_ENABLED=false.
+  adminEnabled: process.env.ADMIN_ENABLED !== 'false',
+
+  // Admin static files path: where the admin SPA files are located.
+  adminPath: process.env.ADMIN_PATH || './admin',
 };
 
 module.exports = config;

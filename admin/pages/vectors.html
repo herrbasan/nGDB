@@ -1,0 +1,348 @@
+<div class="page-vectors">
+	<header>
+		<h1>Vector Databases</h1>
+		<p class="lead">Manage nVDB instances, collections, and vector search</p>
+	</header>
+
+	<section>
+		<nui-button-container>
+			<nui-button data-action="open-vdb">
+				<button type="button">+ Open Vector DB</button>
+			</nui-button>
+		</nui-button-container>
+	</section>
+
+	<section class="list-container">
+		<nui-list id="vdbList"></nui-list>
+	</section>
+
+	<section id="vdbDetail" class="detail-panel" style="display:none;">
+		<h2 id="vdbDetailTitle">Vector DB Details</h2>
+
+		<nui-tabs>
+			<menu>
+				<button data-tab="collections">Collections</button>
+				<button data-tab="search">Search</button>
+				<button data-tab="actions">Actions</button>
+			</menu>
+
+			<section data-panel="collections">
+				<nui-button-container>
+					<nui-button data-action="create-collection">
+						<button type="button">+ Create Collection</button>
+					</nui-button>
+				</nui-button-container>
+				<div id="collectionList" class="collection-grid"></div>
+			</section>
+
+			<section data-panel="search">
+				<nui-input-group>
+					<label>Collection</label>
+					<nui-select id="searchCollection">
+						<select></select>
+					</nui-select>
+				</nui-input-group>
+				<nui-input-group>
+					<label>Vector (comma-separated floats)</label>
+					<nui-textarea id="searchVector">
+						<textarea></textarea>
+					</nui-textarea>
+				</nui-input-group>
+				<nui-input-group>
+					<label>Top K</label>
+					<nui-slider id="searchTopK">
+						<input type="range" min="1" max="100" value="10">
+					</nui-slider>
+				</nui-input-group>
+				<nui-input-group>
+					<label>Distance Metric</label>
+					<nui-select id="searchDistance">
+						<select>
+							<option value="cosine">Cosine</option>
+							<option value="euclidean">Euclidean</option>
+							<option value="dot">Dot Product</option>
+						</select>
+					</nui-select>
+				</nui-input-group>
+				<nui-button-container>
+					<nui-button data-action="run-search">
+						<button type="button">Search</button>
+					</nui-button>
+				</nui-button-container>
+				<div id="searchResults"></div>
+			</section>
+
+			<section data-panel="actions">
+				<nui-button-container>
+					<nui-button data-action="close-vdb">
+						<button type="button">Close Database</button>
+					</nui-button>
+				</nui-button-container>
+			</section>
+		</nui-tabs>
+	</section>
+</div>
+
+<style>
+	.list-container {
+		height: 250px;
+		overflow: hidden;
+	}
+	.detail-panel {
+		margin-top: 2rem;
+		padding: 1rem;
+		border: 1px solid var(--nui-border, #ddd);
+		border-radius: var(--nui-radius, 6px);
+	}
+	.vdb-list-item {
+		display: grid;
+		grid-template-columns: 1fr 120px;
+		gap: 0.5rem;
+		padding: 0.5rem;
+		align-items: center;
+		cursor: pointer;
+	}
+	.vdb-list-item:hover {
+		background: var(--nui-hover, rgba(0,0,0,0.04));
+	}
+	.collection-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		gap: 1rem;
+		margin-top: 1rem;
+	}
+	.collection-card {
+		padding: 1rem;
+		border: 1px solid var(--nui-border, #ddd);
+		border-radius: var(--nui-radius, 6px);
+	}
+	.search-result-item {
+		padding: 0.75rem;
+		border-bottom: 1px solid var(--nui-border, #ddd);
+		display: grid;
+		grid-template-columns: 1fr 80px 1fr;
+		gap: 0.5rem;
+		align-items: center;
+	}
+</style>
+
+<script type="nui/page">
+function init(element, params, nui) {
+	nui = window.nui;
+	const { api } = window.ngdb;
+	const { fromHTML } = nui.util.dom;
+
+	let selectedVdbHandle = null;
+	let collectionNames = [];
+
+	const vdbList = element.querySelector('#vdbList');
+
+	async function loadVdbs() {
+		try {
+			const result = await api('/nvdb/instances');
+			const instances = result.instances || [];
+
+			vdbList.loadData({
+				data: instances,
+				render: (item) => {
+					return fromHTML(
+						'<div class="vdb-list-item">' +
+							'<div><nui-badge variant="info">' + item.handle.substring(0, 8) + '…</nui-badge></div>' +
+							'<div></div>' +
+						'</div>'
+					);
+				},
+				search: [{ prop: 'handle' }],
+				single: true,
+				events: (e) => {
+					if (e.type === 'selection') {
+						const sel = vdbList.getSelection(true);
+						if (sel.length > 0) {
+							// getSelection(true) returns [{data: originalItem}]
+							showVdbDetail(sel[0].data);
+						}
+					}
+				},
+			});
+		} catch (err) {
+			nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
+		}
+	}
+
+	async function showVdbDetail(vdb) {
+		selectedVdbHandle = vdb.handle;
+		element.querySelector('#vdbDetail').style.display = '';
+		element.querySelector('#vdbDetailTitle').textContent = 'Vector DB ' + vdb.handle.substring(0, 8) + '…';
+		await loadCollections();
+	}
+
+	async function loadCollections() {
+		if (!selectedVdbHandle) return;
+		const colList = element.querySelector('#collectionList');
+		const searchCol = element.querySelector('#searchCollection');
+
+		try {
+			const result = await api('/nvdb/instances/' + selectedVdbHandle + '/collections');
+			collectionNames = result.collections || [];
+
+			colList.innerHTML = collectionNames.map(col =>
+				'<div class="collection-card">' +
+					'<h4>' + col.name + '</h4>' +
+					'<p>Dimension: ' + (col.config?.dim || '—') + '</p>' +
+					'<p>Documents: ' + (col.stats?.totalSegmentDocs || 0) + '</p>' +
+					'<p>Segments: ' + (col.stats?.segmentCount || 0) + '</p>' +
+					'<p>Index: ' + (col.hasIndex ? '<nui-badge variant="success">Yes</nui-badge>' : '<nui-badge>No</nui-badge>') + '</p>' +
+					'<nui-button-container>' +
+						'<nui-button data-action="flush-collection" data-collection="' + col.name + '">' +
+							'<button type="button">Flush</button>' +
+						'</nui-button>' +
+						'<nui-button data-action="compact-collection" data-collection="' + col.name + '">' +
+							'<button type="button">Compact</button>' +
+						'</nui-button>' +
+						'<nui-button data-action="rebuild-index" data-collection="' + col.name + '">' +
+							'<button type="button">Rebuild Index</button>' +
+						'</nui-button>' +
+					'</nui-button-container>' +
+				'</div>'
+			).join('');
+
+			searchCol.setItems(collectionNames.map(c => ({
+				value: c.name,
+				label: c.name
+			})));
+		} catch (err) {
+			colList.innerHTML = '<p>Error loading collections: ' + err.message + '</p>';
+		}
+	}
+
+	element.addEventListener('click', async (e) => {
+		const actionEl = e.target.closest('[data-action]');
+		if (!actionEl) return;
+		const action = actionEl.dataset.action;
+
+		if (action === 'open-vdb') {
+			const result = await nui.components.dialog.prompt('Open Vector DB', 'Database path:', {
+				fields: [{ id: 'path', label: 'Path', value: 'myvdb' }]
+			});
+			if (result && result.path) {
+				try {
+					await api('/nvdb/instances', { method: 'POST', body: JSON.stringify({ path: result.path }) });
+					nui.components.banner.show({ content: 'Opened: ' + result.path, priority: 'success', autoClose: 3000 });
+					loadVdbs();
+				} catch (err) {
+					nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
+				}
+			}
+		}
+
+		if (action === 'close-vdb' && selectedVdbHandle) {
+			const confirmed = await nui.components.dialog.confirm('Close Vector DB', 'Are you sure?');
+			if (confirmed) {
+				try {
+					await api('/nvdb/instances/' + selectedVdbHandle, { method: 'DELETE' });
+					selectedVdbHandle = null;
+					element.querySelector('#vdbDetail').style.display = 'none';
+					nui.components.banner.show({ content: 'Closed', priority: 'success', autoClose: 3000 });
+					loadVdbs();
+				} catch (err) {
+					nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
+				}
+			}
+		}
+
+		if (action === 'create-collection' && selectedVdbHandle) {
+			const nameResult = await nui.components.dialog.prompt('Create Collection', 'Collection name:', {
+				fields: [{ id: 'name', label: 'Name', value: 'embeddings' }]
+			});
+			if (nameResult && nameResult.name) {
+				const dimResult = await nui.components.dialog.prompt('Dimension', 'Vector dimension:', {
+					fields: [{ id: 'dim', label: 'Dimension', value: '128' }]
+				});
+				if (dimResult && dimResult.dim) {
+					try {
+						await api('/nvdb/instances/' + selectedVdbHandle + '/collections', {
+							method: 'POST',
+							body: JSON.stringify({ name: nameResult.name, dimension: parseInt(dimResult.dim) }),
+						});
+						nui.components.banner.show({ content: 'Created: ' + nameResult.name, priority: 'success', autoClose: 3000 });
+						loadCollections();
+					} catch (err) {
+						nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
+					}
+				}
+			}
+		}
+
+		if (action === 'flush-collection' && selectedVdbHandle) {
+			const col = actionEl.dataset.collection;
+			try {
+				await api('/nvdb/instances/' + selectedVdbHandle + '/collections/' + col + '/flush', { method: 'POST' });
+				nui.components.banner.show({ content: 'Flushed ' + col, priority: 'success', autoClose: 2000 });
+			} catch (err) {
+				nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
+			}
+		}
+
+		if (action === 'compact-collection' && selectedVdbHandle) {
+			const col = actionEl.dataset.collection;
+			try {
+				await api('/nvdb/instances/' + selectedVdbHandle + '/collections/' + col + '/compact', { method: 'POST' });
+				nui.components.banner.show({ content: 'Compacted ' + col, priority: 'success', autoClose: 2000 });
+				loadCollections();
+			} catch (err) {
+				nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
+			}
+		}
+
+		if (action === 'rebuild-index' && selectedVdbHandle) {
+			const col = actionEl.dataset.collection;
+			try {
+				await api('/nvdb/instances/' + selectedVdbHandle + '/collections/' + col + '/rebuildIndex', { method: 'POST' });
+				nui.components.banner.show({ content: 'Index rebuilt for ' + col, priority: 'success', autoClose: 3000 });
+				loadCollections();
+			} catch (err) {
+				nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
+			}
+		}
+
+		if (action === 'run-search' && selectedVdbHandle) {
+			const searchColEl = element.querySelector('#searchCollection');
+			const searchVecEl = element.querySelector('#searchVector textarea');
+			const searchTopKEl = element.querySelector('#searchTopK');
+			const searchDistEl = element.querySelector('#searchDistance');
+
+			const collection = searchColEl.getValue();
+			const vectorStr = searchVecEl ? searchVecEl.value : '';
+			const topK = searchTopKEl.getValue ? searchTopKEl.getValue() : parseInt(searchTopKEl.querySelector('input')?.value) || 10;
+			const distance = searchDistEl.getValue();
+
+			if (!collection || !vectorStr) {
+				nui.components.banner.show({ content: 'Select collection and enter vector', priority: 'warning' });
+				return;
+			}
+
+			const vector = vectorStr.split(',').map(v => parseFloat(v.trim()));
+			try {
+				const result = await api('/nvdb/instances/' + selectedVdbHandle + '/collections/' + collection + '/search', {
+					method: 'POST',
+					body: JSON.stringify({ vector, topK, distance }),
+				});
+				const results = result.results || [];
+				element.querySelector('#searchResults').innerHTML = results.length > 0
+					? results.map(r =>
+						'<div class="search-result-item">' +
+							'<div><strong>' + r.id + '</strong></div>' +
+							'<div><nui-badge>Score: ' + (r.score?.toFixed(4)) + '</nui-badge></div>' +
+							'<div class="doc-preview">' + JSON.stringify(r.payload || {}).substring(0, 100) + '</div>' +
+						'</div>'
+					).join('')
+					: '<p>No results found</p>';
+			} catch (err) {
+				nui.components.banner.show({ content: 'Search error: ' + err.message, priority: 'danger' });
+			}
+		}
+	});
+
+	loadVdbs();
+}
+</script>
