@@ -1,5 +1,6 @@
-// tests/phase2_test.js — Phase 2: Document API integration tests
-// Tests complete nDB proxy surface: CRUD, query, file buckets
+// tests/phase2_test.js — nGDB integration tests: Phase 2 (Document API)
+// Tests the nGDB /db/* proxy surface: CRUD, query, file buckets.
+// These tests belong to the nGDB project — NOT the nDB submodule.
 // Uses Node.js built-in http module. No test frameworks.
 
 const http = require('http');

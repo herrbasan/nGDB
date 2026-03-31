@@ -1,4 +1,6 @@
-// tests/phase4_test.js — Integration tests for Phase 4: Auth + Multi-tenancy
+// tests/phase4_test.js — nGDB integration tests: Phase 4 (Auth + Multi-Tenancy)
+// Tests nGDB-specific cross-cutting concerns: API key auth, private IP bypass, tenant isolation.
+// These tests belong to the nGDB project — NOT the nDB submodule.
 // Uses Node.js built-in http module. No test frameworks.
 
 const http = require('http');

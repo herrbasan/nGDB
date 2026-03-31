@@ -1,4 +1,6 @@
-// tests/phase5_test.js — Integration tests for Phase 5: nVDB proxy routes
+// tests/phase5_test.js — nGDB integration tests: Phase 5 (nVDB Proxy Routes)
+// Tests the nGDB /vdb/* proxy surface for the nVDB vector database backend.
+// These tests belong to the nGDB project — NOT the nDB or nVDB submodules.
 // Uses Node.js built-in http module. No test frameworks.
 
 const http = require('http');

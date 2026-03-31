@@ -1,4 +1,6 @@
-// tests/phase1_test.js — Integration tests against live nGDB HTTP server
+// tests/phase1_test.js — nGDB integration tests: Phase 1 (Foundation)
+// Tests the nGDB service layer (HTTP server, health check, /db/* proxy routes).
+// These tests belong to the nGDB project — NOT the nDB submodule.
 // Uses Node.js built-in http module. No test frameworks.
 
 const http = require('http');

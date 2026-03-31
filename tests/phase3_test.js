@@ -1,6 +1,7 @@
-// tests/phase3_test.js — Phase 3: Real-Time WebSocket integration tests
+// tests/phase3_test.js — nGDB integration tests: Phase 3 (Real-Time WebSocket)
+// Tests the nGDB WebSocket layer: WS connection, DB proxy over WS, subscriptions, broadcast, ping/pong.
+// These tests belong to the nGDB project — NOT the nDB submodule.
 // Uses raw TCP + WebSocket protocol. No external dependencies.
-// Tests: WS connection, DB proxy over WS, subscriptions, broadcast, ping/pong.
 
 const net = require('net');
 const http = require('http');
