@@ -30,174 +30,34 @@ These decisions were resolved before implementation begins. See [nDB-spec §Reso
 
 ---
 
-## Phase 1: Storage Core ✅
-**Goal:** Basic JSON Lines storage with O(1) operations, in-memory document store
-
-- [x] **Project setup** ([nDB-spec §Implementation Notes](./nDB-spec.md#language-rust--internal-n-api-napi-rs))
-  - Rust crate structure (workspace with `napi/` sub-crate, following nVDB pattern)
-  - Dev dependencies only (tempfile, criterion)
-
-- [x] **NanoID `_id` generation** ([nDB-spec §`_id` Generation](./nDB-spec.md#_id-generation))
-  - 16-char base62 PRNG-based ID generation
-  - Uniqueness check against existing HashMap
-  - Optional prefix support (`insert_with_prefix`)
-
-- [x] **JSON Lines I/O** ([nDB-spec §Storage Format](./nDB-spec.md#storage-format))
-  - Append-only file writer
-  - Line parsing (serde_json)
-  - Basic metadata header (`_meta` line)
-
-- [x] **In-memory document store** ([nDB-spec §Layer 1: Core](./nDB-spec.md#layer-1-core-the-fast-path))
-  - `RwLock<HashMap<String, Value>>` for `_id → document`
-  - Load all documents from JSON Lines on open
-  - Single-writer Mutex for write operations
-
-- [x] **Core operations**
-  - `insert(doc)` → generate NanoID, store in HashMap, append to file
-  - `get(id)` → O(1) HashMap lookup
-  - `delete(id)` → soft delete (tombstone in HashMap, append `_deleted` to file)
-
-**Deliverable:** In-memory test passing basic CRUD with NanoID identifiers ✅
+## Completed Phases
+- **Phase 1: Storage Core** ✅ Basic JSON Lines storage, NanoID, single-writer Mutex.
+- **Phase 2: Advanced Core** ✅ Updates, iteration, compaction, and trash handling.
+- **Phase 3: File Buckets** ✅ Binary storage, hashing, deduplication.
+- **Phase 4: Query Layer** ✅ JSON AST query evaluator, opt-in indexing.
+- **Phase 5: N-API Bindings** ✅ Node.js integration via napi-rs.
+- **Phase 6: Production Polish** ✅ Benchmarks, crash recovery, edge-case hardening.
 
 ---
 
-## Phase 2: Advanced Core ✅
-**Goal:** Updates, iteration, compaction, and trash
+## Phase 7: CLI & Snapshot Tooling (Current)
+**Goal:** Provide a native Rust CLI for maintaining databases and exporting portable snapshots. 
 
-- [x] **Update operation** ([nDB-spec §Core Methods](./nDB-spec.md#core-methods))
-  - Replace document in HashMap
-  - Append new version to file (old version superseded by index)
+**Reference:** [CLI & Snapshot Specification](./cli-spec.md)
 
-- [x] **Iteration** ([nDB-spec §iter()](./nDB-spec.md#layer-1-core-the-fast-path))
-  - `iter()` over all non-deleted docs from HashMap
-  - Filter out tombstones
-
-- [x] **Compaction** ([nDB-spec §Compaction Strategy](./nDB-spec.md#compaction-strategy))
-  - Scan active docs from HashMap
-  - Rewrite to temp file
-  - Atomic swap
-  - Archive deleted docs to trash
-
-- [x] **Trash bucket** ([nDB-spec §Compaction & Document Trash](./nDB-spec.md#compaction--document-trash))
-  - Soft delete (tombstone in HashMap)
-  - Trash directory structure
-  - `restore()` from trash
-
-- [x] **Persistence modes** ([nDB-spec §Operating Modes](./nDB-spec.md#operating-modes))
-  - `Persistence::Lazy` (default) — flush on explicit call or shutdown
-  - `Persistence::Scheduled(N)` — flush every N seconds
-  - `Persistence::Immediate` — fsync after every write
-
-**Deliverable:** Compaction working, deleted docs recoverable, configurable persistence ✅
-
----
-
-## Phase 3: File Buckets ✅
-**Goal:** Binary storage with deduplication
-
-- [x] **File bucket I/O** ([nDB-spec §File Buckets](./nDB-spec.md#file-buckets---binary-storage))
-  - SHA-256 hash calculation (implement ourselves)
-  - Hash-based storage path
-  - Atomic file writes
-
-- [x] **File operations** ([nDB-spec §File Bucket Methods](./nDB-spec.md#file-bucket-methods))
-  - `store(name, data)` → `FileRef`
-  - `get(hash)` → bytes
-  - `delete(hash)` → move to trash
-
-- [x] **Trash coordination** ([nDB-spec §Trash behavior](./nDB-spec.md#file-layout))
-  - File trash directory
-  - Restore from trash
-  - Optional TTL cleanup
-
-**Deliverable:** Can store/retrieve files alongside documents ✅
-
----
-
-## Phase 4: Query Layer ✅
-**Goal:** Layer 2 & 3 query APIs
-
-- [x] **Single field queries** ([nDB-spec §Layer 2](./nDB-spec.md#layer-2-single-field-queries-the-9))
-  - `find(field, value)` - linear scan over HashMap
-  - `find_where(field, predicate)`
-  - Iterator-based (lazy)
-
-- [x] **Opt-in indexing** ([nDB-spec §Opt-In Indexing](./nDB-spec.md#opt-in-indexing))
-  - `create_index(field)` → HashMap
-  - `find()` uses index if available
-  - `drop_index()` to free memory
-
-- [x] **JSON AST query evaluator** ([nDB-spec §Layer 3](./nDB-spec.md#layer-3-json-ast-queries-the-1))
-  - `QueryNode` enum for AST representation
-  - Recursive evaluator over `iter()`
-  - Operators: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$exists`
-  - Combinators: `$and`, `$or`, `$not`
-  - `query_with(ast, opts)` with limit/sort/offset
-
-**Deliverable:** Complex queries working with optional indexes via JSON AST ✅
-
----
-
-## Phase 5: N-API Bindings ✅
-**Goal:** Node.js integration via direct napi-rs
-
-- [x] **Setup napi-rs** (following nVDB's `napi/` pattern)
-  - Add `napi` and `napi-derive` dependencies
-  - Workspace Cargo.toml with `napi/` sub-crate
-  - Setup build.rs and package.json linkage
-
-- [x] **JS API surface** ([nDB-spec §Node.js / Electron Usage](./nDB-spec.md#nodejs--electron-usage))
-  - `Database` class constructor in `napi/src/lib.rs`
-  - `insert()`, `get()`, `delete()`, `update()` methods
-  - `query(ast)` — accepts raw JSON object, passes as AST
-
-- [x] **File API**
-  - `bucket(name)` accessor
-  - `store()`, `get()` methods
-  - Buffer handling
-
-- [x] **Package build**
-  - napi-rs build config
-  - Prebuild binaries
-  - Vanilla JS module exports
-  - `.d.ts` definitions generated for LLM/editor context only
-
-**Deliverable:** `npm install` and `require('ndb')` works ✅
-
----
-
-## Phase 6: Production Polish ✅
-**Goal:** Performance and reliability
-
-- [x] **Persistence guarantees**
-  - fsync options (already implemented in Phase 2, stress test here)
-  - Corruption detection on load
-  - Crash recovery scenarios
-
-- [x] **Benchmarks**
-  - Insert throughput (in-memory, lazy, immediate, bulk)
-  - Query latency (Layer 1 get, Layer 2 find, Layer 3 JSON AST)
-  - Indexed vs non-indexed query comparison
-  - Compaction performance
-  - Update and delete throughput
-  - Iteration over large datasets
-
-- [x] **Edge cases**
-  - Empty database operations
-  - Very large documents (1MB+)
-  - Deeply nested documents (50 levels)
-  - Documents with many fields (1000+)
-  - Unicode values
-  - Null and special JSON values
-  - Concurrent read stress test (multi-threaded)
-  - Concurrent queries during inserts
-  - Power-loss simulation (partial writes, truncated lines)
-  - Compaction under load
-  - Full lifecycle persist/reopen
-
-**Deliverable:** Benchmarked, production-ready package
-
----
+- [ ] **CLI Infrastructure**
+  - **No dependencies:** Do NOT use `clap`. We stick to the maxims. The CLI must be fully parsed natively using `std::env::args()`. Simple > Abstraction.
+  - Create `src/bin/ndb.rs` as the database management executable. We actively reject building a `shared-cli-crate`, since having self-contained, independent scripts maps much better to an LLM context window than deeply nested DRY abstractions.
+- [ ] **Database Inspection (`ndb info`)**
+  - Read `meta.json`.
+  - Calculate document counts, active size vs. trash size, and fragmentation ratio.
+  - Output human-readable statistics to terminal.
+- [ ] **Offline Compaction (`ndb compact`)**
+  - CLI command to trigger an in-place compaction out-of-band from the Node process.
+- [ ] **Snapshot System (`ndb export` / `ndb import`)**
+  - Core API `export_snapshot(target_dir)`: streams active data directly into a pristine, zero-trash directory with `snapshot.json`.
+  - CLI command `ndb export <db-path> <export-dir>` wrapping the API.
+  - CLI command `ndb import <snapshot-dir> <dest-path>` for validating a snapshot and positioning it for the application.
 
 ## Dependencies
 
