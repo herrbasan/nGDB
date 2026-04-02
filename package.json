@@ -8,6 +8,7 @@
     "test": "node tests/phase1_test.js"
   },
   "dependencies": {
+    "dotenv": "^17.3.1",
     "ndb": "file:./ndb/napi",
     "nvdb": "file:./nvdb/napi"
   },

@@ -1,10 +1,23 @@
 // src/server.js — nGDB HTTP + WebSocket server entry point
 // Vanilla Node.js HTTP server with WebSocket upgrade. No frameworks.
 
+// Load .env file if present
+try {
+  require('dotenv').config();
+} catch (e) {
+  // dotenv not installed, skip
+}
+
 const http = require('http');
 const config = require('./config');
 const { route } = require('./transports/http');
 const { handleUpgrade } = require('./ws');
+
+// Auto-discover and open databases on startup
+const { autoOpenDatabases } = require('./handlers/db');
+autoOpenDatabases().then(count => {
+  if (count > 0) console.log(`[server] Auto-opened ${count} databases`);
+});
 
 const server = http.createServer((req, res) => {
   route(req, res).catch((err) => {

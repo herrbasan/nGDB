@@ -21,7 +21,12 @@ const PRIVATE_IPV6_PREFIXES = [
 function isPrivateIP(ip) {
   if (!ip) return false;
   // IPv6 in bracket notation: [::1]
-  const clean = ip.replace(/^\[|\]$/g, '');
+  let clean = ip.replace(/^\[|\]$/g, '');
+
+  // Handle IPv4-mapped IPv6 addresses (::ffff:127.0.0.1, ::ffff:192.168.x.x, etc.)
+  if (clean.startsWith('::ffff:')) {
+    clean = clean.substring(7); // Extract IPv4 part
+  }
 
   // IPv4 check
   if (PRIVATE_IPV4_RE.some(re => re.test(clean))) return true;
@@ -50,6 +55,24 @@ function extractApiKey(req, url) {
   return null;
 }
 
+// Get client IP considering proxies
+function getClientIP(req) {
+  // Check X-Forwarded-For header (common with proxies)
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    // X-Forwarded-For can be a comma-separated list, take the first one
+    const firstIP = forwarded.split(',')[0].trim();
+    return firstIP;
+  }
+  
+  // Check X-Real-IP header (nginx proxy)
+  const realIP = req.headers['x-real-ip'];
+  if (realIP) return realIP;
+  
+  // Fall back to socket remote address
+  return req.socket && req.socket.remoteAddress;
+}
+
 // Returns { ok: true } or { ok: false, status, message }
 function checkAuth(req) {
   // No keys configured — auth disabled, everything passes
@@ -57,12 +80,11 @@ function checkAuth(req) {
     return { ok: true };
   }
 
+  const remoteIP = getClientIP(req);
+
   // Local network bypass
-  if (config.localAuthBypass) {
-    const remoteIP = req.socket && req.socket.remoteAddress;
-    if (isPrivateIP(remoteIP)) {
-      return { ok: true };
-    }
+  if (config.localAuthBypass && isPrivateIP(remoteIP)) {
+    return { ok: true };
   }
 
   // Validate API key

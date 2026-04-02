@@ -1,0 +1,355 @@
+/* admin/css/admin.css — nGDB Admin shared styles
+ * Reduces inline styles across all admin pages and features.
+ * Uses NUI CSS custom properties (--nui-*) for theme consistency.
+ */
+
+/* ─── Page Layout ─────────────────────────────────────────────────── */
+
+.page-header {
+	margin-bottom: 1.5rem;
+}
+
+.page-header h1 {
+	margin: 0 0 0.25rem;
+}
+
+.page-header .lead {
+	color: var(--nui-text-muted);
+	margin: 0;
+}
+
+.page-header__row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 1rem;
+}
+
+.page-header__actions {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+}
+
+/* ─── Stat Cards Grid ─────────────────────────────────────────────── */
+
+.stat-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: 1rem;
+	margin-bottom: 2rem;
+}
+
+.stat-card {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	padding: 1rem;
+}
+
+.stat-card__icon {
+	font-size: 2rem;
+	flex-shrink: 0;
+}
+
+.stat-card__icon--success { color: var(--nui-success); }
+.stat-card__icon--info    { color: var(--nui-info); }
+.stat-card__icon--warning { color: var(--nui-warning); }
+.stat-card__icon--danger  { color: var(--nui-danger); }
+
+.stat-card__label {
+	font-size: 0.875rem;
+	color: var(--nui-text-muted);
+}
+
+.stat-card__value {
+	font-size: 1.25rem;
+	font-weight: 600;
+}
+
+/* ─── Section Layout ──────────────────────────────────────────────── */
+
+.section {
+	margin-bottom: 2rem;
+}
+
+.section h2 {
+	margin-top: 0;
+}
+
+.section h3 {
+	margin-top: 0;
+}
+
+/* ─── Card Grid ───────────────────────────────────────────────────── */
+
+.card-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: 1rem;
+}
+
+/* ─── DB Card (databases page) ────────────────────────────────────── */
+
+.db-card {
+	border: 1px solid var(--nui-border);
+	border-radius: var(--nui-radius);
+	padding: 1rem;
+	background: var(--nui-surface);
+	transition: box-shadow 0.15s ease;
+}
+
+.db-card:hover {
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.db-card--unloaded {
+	opacity: 0.8;
+}
+
+.db-card__row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.db-card__info {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.db-card__name {
+	font-weight: 600;
+}
+
+.db-card__path {
+	font-size: 0.875rem;
+	color: var(--nui-text-muted);
+	word-break: break-all;
+}
+
+.db-card__badges {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+}
+
+.db-card__actions {
+	margin-top: 0.5rem;
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.db-card__meta {
+	font-size: 0.875rem;
+	color: var(--nui-text-muted);
+	margin-top: 0.25rem;
+}
+
+/* ─── Status Indicator ────────────────────────────────────────────── */
+
+.status-dot {
+	font-size: 1.25rem;
+	line-height: 1;
+	flex-shrink: 0;
+}
+
+.status-dot--loaded   { color: #4caf50; }
+.status-dot--unloaded { color: var(--nui-text-muted); }
+
+/* ─── Info Grid (settings page) ───────────────────────────────────── */
+
+.info-grid {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.info-row {
+	display: grid;
+	grid-template-columns: 180px 1fr;
+	gap: 0.5rem;
+	align-items: baseline;
+}
+
+.info-row strong {
+	white-space: nowrap;
+}
+
+/* ─── Panel (surface background) ──────────────────────────────────── */
+
+.panel {
+	padding: 1rem;
+	background: var(--nui-surface);
+	border-radius: var(--nui-radius);
+}
+
+.panel--search {
+	margin-bottom: 1rem;
+}
+
+/* ─── Result Items ────────────────────────────────────────────────── */
+
+.result-item {
+	display: flex;
+	gap: 1rem;
+	align-items: center;
+	padding: 0.75rem;
+	background: var(--nui-surface);
+	border-radius: var(--nui-radius);
+}
+
+.result-item__body {
+	flex: 1;
+	min-width: 0;
+}
+
+.result-item__id {
+	font-family: monospace;
+	font-size: 0.875rem;
+	word-break: break-all;
+}
+
+.result-item__meta {
+	font-size: 0.75rem;
+	color: var(--nui-text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ─── JSON Viewer ─────────────────────────────────────────────────── */
+
+.json-viewer {
+	font-family: monospace;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	padding: 1rem;
+	background: var(--nui-surface);
+	border: 1px solid var(--nui-border);
+	border-radius: var(--nui-radius);
+	overflow: auto;
+	max-height: 60vh;
+	white-space: pre-wrap;
+	word-break: break-word;
+	tab-size: 2;
+}
+
+.json-viewer__key {
+	color: var(--nui-info, #1565c0);
+}
+
+.json-viewer__string {
+	color: var(--nui-success, #2e7d32);
+}
+
+.json-viewer__number {
+	color: var(--nui-warning, #e65100);
+}
+
+.json-viewer__boolean {
+	color: #7b1fa2;
+}
+
+.json-viewer__null {
+	color: var(--nui-text-muted);
+	font-style: italic;
+}
+
+/* ─── Empty State ─────────────────────────────────────────────────── */
+
+.empty-state {
+	padding: 2rem;
+	text-align: center;
+	color: var(--nui-text-muted);
+}
+
+.empty-state__icon {
+	font-size: 3rem;
+	margin-bottom: 0.5rem;
+	opacity: 0.5;
+}
+
+.empty-state__text {
+	font-size: 0.9375rem;
+}
+
+/* ─── Flex Utilities ──────────────────────────────────────────────── */
+
+.flex-row {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+}
+
+.flex-row--wrap {
+	flex-wrap: wrap;
+}
+
+.flex-row--between {
+	justify-content: space-between;
+}
+
+.flex-col {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.gap-sm { gap: 0.5rem; }
+.gap-md { gap: 1rem; }
+.gap-lg { gap: 1.5rem; }
+
+/* ─── Text Utilities ──────────────────────────────────────────────── */
+
+.text-muted {
+	color: var(--nui-text-muted);
+}
+
+.text-small {
+	font-size: 0.875rem;
+}
+
+.text-mono {
+	font-family: monospace;
+}
+
+.text-truncate {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ─── Spacing Utilities ───────────────────────────────────────────── */
+
+.mt-0 { margin-top: 0; }
+.mt-sm { margin-top: 0.5rem; }
+.mt-md { margin-top: 1rem; }
+.mt-lg { margin-top: 1.5rem; }
+.mb-0 { margin-bottom: 0; }
+.mb-sm { margin-bottom: 0.5rem; }
+.mb-md { margin-bottom: 1rem; }
+.mb-lg { margin-bottom: 1.5rem; }
+
+/* ─── Responsive ──────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+	.stat-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	.card-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.info-row {
+		grid-template-columns: 1fr;
+	}
+
+	.page-header__row {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+}

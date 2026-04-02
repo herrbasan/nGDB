@@ -1029,6 +1029,46 @@ await ngdb.search('embeddings', { vector: q, k: 10 });   // → nVDB
 - [ ] Prebuilt binaries for all platforms
 - [ ] nGDB service wrapper (REST/WebSocket)
 
+## Admin UI Auto-Discovery
+
+The nGDB Admin UI implements **auto-discovery** of databases at server startup:
+
+### How It Works
+
+```javascript
+// Server startup (src/server.js)
+autoOpenAllDatabases().then(count => {
+  console.log(`[server] Auto-opened ${count} databases`);
+});
+
+// Scans ./data/ndb/ recursively for .jsonl files
+// Opens each one automatically
+// Populates sidebar navigation without manual "open" steps
+```
+
+### Admin UI Flow
+
+1. **Server starts** → Discovers all `.jsonl` files in `data/ndb/`
+2. **Auto-opens** → Each database loaded into memory with unique handle
+3. **Sidebar loads** → Dynamic navigation fetches open databases from API
+4. **User clicks database** → Directly browses documents (no "open" step)
+
+### API for Admin
+
+```
+GET  /admin/api/ndb              → List open instances
+POST /admin/api/ndb/open         → Open database by path
+DEL  /admin/api/ndb/:handle      → Close instance
+GET  /admin/api/ndb/:handle/docs → List documents (paginated)
+```
+
+### Benefits
+
+- **Zero configuration**: Databases appear automatically
+- **Immediate access**: No manual "open" workflow
+- **Discoverability**: See all available databases in sidebar
+- **Simpler mental model**: "The data is just there"
+
 ---
 
-*"The database is just a file + HashMap. Need more? Add code, not complexity."*
+*"The database is just a file + HashMap. Need more? Add code, not complexity."

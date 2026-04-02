@@ -5,20 +5,130 @@
 const { Database } = require('ndb');
 const { randomUUID } = require('crypto');
 const path = require('path');
+const fs = require('fs');
 const { ndbDataDir } = require('../middleware/tenancy');
 
 // Open database instances by handle ID
 // Map stores { db, path } objects so admin UI can retrieve the path
 const instances = new Map();
 
+// Auto-discover and open all databases on disk
+async function autoOpenDatabases() {
+  const baseDir = ndbDataDir();
+  let count = 0;
+  
+  function scanAndOpen(dir, depth = 0) {
+    if (depth > 2) return;
+    try {
+      const entries = fs.readdirSync(dir);
+      for (const entry of entries) {
+        if (entry.startsWith('_') || entry.startsWith('.')) continue;
+        const fullPath = path.join(dir, entry);
+        const stat = fs.statSync(fullPath);
+        if (stat.isFile() && entry.endsWith('.jsonl')) {
+          try {
+            // Check if already open
+            const alreadyOpen = Array.from(instances.values()).some(inst => inst.path === fullPath);
+            if (!alreadyOpen) {
+              const db = Database.open(fullPath);
+              const handle = randomUUID();
+              instances.set(handle, { db, path: fullPath });
+              console.log('[db] Auto-opened:', fullPath, 'handle:', handle.substring(0, 8));
+              count++;
+            }
+          } catch (e) {
+            console.error('[db] Failed to auto-open:', fullPath, e.message);
+          }
+        } else if (stat.isDirectory()) {
+          scanAndOpen(fullPath, depth + 1);
+        }
+      }
+    } catch (e) {}
+  }
+  
+  scanAndOpen(baseDir);
+  return count;
+}
+
+// Recursively scan for database files
+function scanForDatabases(dir, baseDir, depth = 0) {
+  const databases = [];
+  
+  if (depth > 3) return databases; // Limit recursion depth
+  
+  try {
+    const entries = fs.readdirSync(dir);
+    
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry);
+      const stat = fs.statSync(fullPath);
+      
+      // Skip hidden and system directories/files
+      if (entry.startsWith('_') || entry.startsWith('.')) continue;
+      
+      if (stat.isFile() && entry.endsWith('.jsonl')) {
+        // Found a database file - use the parent directory name as the database name
+        // e.g., data/ngdb-countries/db.jsonl -> name: ngdb-countries
+        const parentDir = path.basename(dir);
+        const name = parentDir !== path.basename(baseDir) ? parentDir : entry.slice(0, -7);
+        
+        // Skip trash files
+        if (entry === 'trash.jsonl') continue;
+        
+        databases.push({
+          name,
+          path: fullPath,
+          size: stat.size,
+          modified: stat.mtime.toISOString()
+        });
+      } else if (stat.isDirectory()) {
+        // Recurse into subdirectory
+        databases.push(...scanForDatabases(fullPath, baseDir, depth + 1));
+      }
+    }
+  } catch (err) {
+    // Ignore errors (permission denied, etc)
+  }
+  
+  return databases;
+}
+
+// List available databases in the data directory
+function listAvailable(params, ctx) {
+  const tenantId = ctx && ctx.tenantId;
+  const baseDir = ndbDataDir(tenantId);
+  
+  console.log('[db] Scanning for databases in:', baseDir);
+  
+  let databases = [];
+  
+  try {
+    // Ensure directory exists
+    if (!fs.existsSync(baseDir)) {
+      console.log('[db] Data directory does not exist:', baseDir);
+      return { databases };
+    }
+    
+    databases = scanForDatabases(baseDir, baseDir);
+    
+  } catch (err) {
+    console.error('[db] Error scanning for databases:', err.message);
+  }
+  
+  console.log('[db] Found databases:', databases);
+  return { databases };
+}
+
 function open(params, ctx) {
   const tenantId = ctx && ctx.tenantId;
   const baseDir = ndbDataDir(tenantId);
   const dbPath = path.isAbsolute(params.path) ? params.path : path.join(baseDir, params.path);
+  console.log('[db] Opening database:', dbPath, 'tenant:', tenantId);
   const options = params.options;
   const db = options ? Database.open(dbPath, options) : Database.open(dbPath);
   const handle = randomUUID();
   instances.set(handle, { db, path: dbPath });
+  console.log('[db] Database opened, handle:', handle, 'total instances:', instances.size);
   return { handle };
 }
 
@@ -241,6 +351,7 @@ const handlers = {
   isEmpty,
   restore,
   deletedIds,
+  listAvailable,
   // Bucket operations
   storeFile,
   getFile,
@@ -248,4 +359,4 @@ const handlers = {
   listFiles,
 };
 
-module.exports = { handlers, instances };
+module.exports = { handlers, instances, autoOpenDatabases };

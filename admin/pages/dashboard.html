@@ -1,167 +1,319 @@
 <div class="page-dashboard">
-	<header>
+	<header class="page-header">
 		<h1>Dashboard</h1>
-		<p class="lead">nGDB service overview and health status</p>
+		<p class="lead">nGDB service overview and status</p>
 	</header>
 
-	<section>
-		<nui-layout columns="4" gap="1rem">
-			<nui-card>
-				<div class="stat-card">
-					<div>
-						<h3>Service Status</h3>
-						<p id="serviceStatus">Loading...</p>
-					</div>
+	<!-- Primary Stats -->
+	<section class="stat-grid" id="primaryStats">
+		<nui-card>
+			<div class="stat-card">
+				<nui-icon name="check_circle" class="stat-card__icon stat-card__icon--success">✓</nui-icon>
+				<div>
+					<div class="stat-card__label">Status</div>
+					<div class="stat-card__value" id="statusValue">Loading...</div>
 				</div>
-			</nui-card>
-			<nui-card>
-				<div class="stat-card">
-					<div>
-						<h3>nDB Instances</h3>
-						<p id="ndbCount">—</p>
-					</div>
+			</div>
+		</nui-card>
+
+		<nui-card>
+			<div class="stat-card">
+				<nui-icon name="database" class="stat-card__icon stat-card__icon--info">🗄</nui-icon>
+				<div>
+					<div class="stat-card__label">nDB Databases</div>
+					<div class="stat-card__value" id="ndbCount">—</div>
 				</div>
-			</nui-card>
-			<nui-card>
-				<div class="stat-card">
-					<div>
-						<h3>nVDB Instances</h3>
-						<p id="nvdbCount">—</p>
-					</div>
+			</div>
+		</nui-card>
+
+		<nui-card>
+			<div class="stat-card">
+				<nui-icon name="article" class="stat-card__icon stat-card__icon--info">📄</nui-icon>
+				<div>
+					<div class="stat-card__label">Total Documents</div>
+					<div class="stat-card__value" id="totalDocs">—</div>
 				</div>
-			</nui-card>
-			<nui-card>
-				<div class="stat-card">
-					<div>
-						<h3>Connections</h3>
-						<p id="wsConnections">—</p>
-					</div>
+			</div>
+		</nui-card>
+
+		<nui-card>
+			<div class="stat-card">
+				<nui-icon name="delete" class="stat-card__icon stat-card__icon--warning">🗑</nui-icon>
+				<div>
+					<div class="stat-card__label">Trashed Items</div>
+					<div class="stat-card__value" id="totalTrash">—</div>
 				</div>
-			</nui-card>
-		</nui-layout>
+			</div>
+		</nui-card>
+
+		<nui-card>
+			<div class="stat-card">
+				<nui-icon name="empty_dashboard" class="stat-card__icon stat-card__icon--warning">📊</nui-icon>
+				<div>
+					<div class="stat-card__label">nVDB Instances</div>
+					<div class="stat-card__value" id="nvdbCount">—</div>
+				</div>
+			</div>
+		</nui-card>
+
+		<nui-card>
+			<div class="stat-card">
+				<nui-icon name="rss_feed" class="stat-card__icon stat-card__icon--success">📡</nui-icon>
+				<div>
+					<div class="stat-card__label">WS Connections</div>
+					<div class="stat-card__value" id="wsCount">—</div>
+				</div>
+			</div>
+		</nui-card>
 	</section>
 
-	<section>
+	<!-- Per-Database Breakdown -->
+	<section class="section" id="dbBreakdownSection" style="display: none;">
+		<h2>Database Overview</h2>
+		<div id="dbBreakdown" class="card-grid">
+			<nui-progress indeterminate>Loading databases...</nui-progress>
+		</div>
+	</section>
+
+	<!-- Quick Actions -->
+	<section class="section">
 		<h2>Quick Actions</h2>
-		<nui-button-container>
-			<nui-button data-action="open-ndb">
-				<button type="button">Open nDB Database</button>
+		<nui-button-container class="mt-sm">
+			<nui-button data-action="navigate" data-target="#feature=databases">
+				<button type="button">Manage Databases</button>
 			</nui-button>
-			<nui-button data-action="open-nvdb">
-				<button type="button">Open nVDB Database</button>
+			<nui-button data-action="navigate" data-target="#feature=buckets">
+				<button type="button">File Buckets</button>
+			</nui-button>
+			<nui-button data-action="navigate" data-target="#feature=vectors">
+				<button type="button">Vector DBs</button>
 			</nui-button>
 		</nui-button-container>
 	</section>
 
-	<section>
-		<h2>Service Info</h2>
+	<!-- Backend Details -->
+	<section class="section">
 		<nui-accordion>
-			<details open>
-				<summary>Backends</summary>
-				<div id="backendInfo">Loading...</div>
+			<details>
+				<summary>Backend Status</summary>
+				<div id="backendStatus" style="padding: 1rem;">
+					<nui-progress indeterminate>Loading...</nui-progress>
+				</div>
 			</details>
 			<details>
-				<summary>WebSocket Subscriptions</summary>
-				<div id="subscriptionInfo">Loading...</div>
+				<summary>Server Info</summary>
+				<div id="serverInfo" style="padding: 1rem;">
+					<nui-progress indeterminate>Loading...</nui-progress>
+				</div>
 			</details>
 		</nui-accordion>
 	</section>
 </div>
 
-<style>
-	.stat-card h3 { margin: 0 0 0.25rem; font-size: 0.875rem; }
-	.stat-card p { margin: 0; font-size: 1.5rem; font-weight: 600; }
-</style>
-
 <script type="nui/page">
 function init(element, params, nui) {
-	nui = window.nui;
-	const { api } = window.ngdb;
-	let refreshTimer = null;
+	const { api, ndbApi } = window.ngdb;
 
-	async function loadDashboard() {
+	async function loadStatus() {
 		try {
 			const status = await api('/status');
 
-			element.querySelector('#serviceStatus').textContent = status.status || 'Unknown';
+			// Update primary stat cards
+			const isHealthy = status.status === 'healthy';
+			element.querySelector('#statusValue').textContent = isHealthy ? 'Healthy' : 'Degraded';
 			element.querySelector('#ndbCount').textContent = status.backends?.ndbInstances ?? '—';
 			element.querySelector('#nvdbCount').textContent = status.backends?.nvdbInstances ?? '—';
-			element.querySelector('#wsConnections').textContent = status.connections ?? '—';
+			element.querySelector('#wsCount').textContent = status.connections ?? '—';
 
-			const backendInfo = element.querySelector('#backendInfo');
-			backendInfo.innerHTML = '<p>nDB: <nui-badge variant="success">' +
-				(status.backends?.ndb || 'unknown') +
-				'</nui-badge></p><p>nVDB: <nui-badge variant="success">' +
-				(status.backends?.nvdb || 'unknown') +
-				'</nui-badge></p><p>Uptime: ' +
-				Math.floor((status.uptime || 0) / 60) + ' min</p>';
+			// Backend status
+			element.querySelector('#backendStatus').innerHTML = `
+				<div class="info-grid">
+					<div><strong>nDB:</strong> ${status.backends?.ndb || 'unknown'}</div>
+					<div><strong>nVDB:</strong> ${status.backends?.nvdb || 'unknown'}</div>
+					<div><strong>Subscriptions:</strong> ${status.subscriptions ?? 0}</div>
+					<div><strong>Collections:</strong> ${status.collections ?? 0}</div>
+				</div>
+			`;
 
-			const subInfo = element.querySelector('#subscriptionInfo');
-			const subs = status.subscriptions || 0;
-			const collections = status.collections || [];
-			subInfo.innerHTML = '<p>Active subscriptions: <strong>' + subs +
-				'</strong></p><p>Watched collections: ' +
-				(collections.length > 0 ? collections.join(', ') : 'none') + '</p>';
+			// Server info
+			element.querySelector('#serverInfo').innerHTML = `
+				<div class="info-grid">
+					<div><strong>Version:</strong> ${status.version || '—'}</div>
+					<div><strong>Uptime:</strong> ${formatDuration(status.uptime || 0)}</div>
+					<div><strong>API Keys:</strong> ${status.config?.hasApiKeys ? 'Configured' : 'None'}</div>
+					<div><strong>Local Auth Bypass:</strong> ${status.config?.localAuthBypass ? 'Enabled' : 'Disabled'}</div>
+				</div>
+			`;
+
+			// Load per-database breakdown
+			await loadDbBreakdown();
+
 		} catch (err) {
-			element.querySelector('#serviceStatus').textContent = 'Error: ' + err.message;
+			element.querySelector('#statusValue').textContent = 'Error';
+			element.querySelector('#backendStatus').innerHTML = `<p style="color: var(--nui-danger);">Failed to load: ${escapeHtml(err.message)}</p>`;
+			element.querySelector('#serverInfo').innerHTML = `<p style="color: var(--nui-danger);">Failed to load: ${escapeHtml(err.message)}</p>`;
 		}
 	}
 
-	loadDashboard();
+	async function loadDbBreakdown() {
+		try {
+			const result = await ndbApi.list();
+			const allDbs = result.databases || [];
 
-	// Quick action handlers
-	element.addEventListener('click', async (e) => {
-		const action = e.target.closest('[data-action]')?.dataset.action;
-		if (!action) return;
+			if (allDbs.length === 0) {
+				element.querySelector('#dbBreakdownSection').style.display = 'none';
+				element.querySelector('#totalDocs').textContent = '0';
+				element.querySelector('#totalTrash').textContent = '0';
+				return;
+			}
 
-		if (action === 'open-ndb') {
-			const result = await nui.components.dialog.prompt('Open nDB Database', 'Enter database path:', {
-				fields: [{ id: 'path', label: 'Path', value: 'mydb' }]
-			});
-			if (result && result.path) {
-				try {
-					await api('/ndb/instances', { method: 'POST', body: JSON.stringify({ path: result.path }) });
-					nui.components.banner.show({ content: 'Opened nDB: ' + result.path, priority: 'success', autoClose: 3000 });
-					loadDashboard();
-				} catch (err) {
-					nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
+			element.querySelector('#dbBreakdownSection').style.display = '';
+
+			// Calculate totals
+			let totalDocs = 0;
+			let totalTrash = 0;
+			for (const db of allDbs) {
+				totalDocs += db.docCount || 0;
+				if (db.trash?.exists) {
+					totalTrash += db.trash.count || 0;
 				}
 			}
+			element.querySelector('#totalDocs').textContent = totalDocs.toLocaleString();
+			element.querySelector('#totalTrash').textContent = totalTrash > 0 ? totalTrash : '0';
+
+			// Render per-DB cards
+			const loadedDbs = allDbs.filter(db => db.loaded);
+			const unloadedDbs = allDbs.filter(db => !db.loaded);
+
+			let html = '';
+
+			if (loadedDbs.length > 0) {
+				html += loadedDbs.map(db => {
+					const trashBadge = db.trash?.exists && db.trash.count > 0
+						? `<nui-badge variant="warning" title="${db.trash.count} items in trash">🗑 ${db.trash.count}</nui-badge>`
+						: '';
+					return `
+						<nui-card class="db-card">
+							<div class="db-card__row">
+								<div class="db-card__info">
+									<span class="status-dot status-dot--loaded" title="Loaded">●</span>
+									<div>
+										<div class="db-card__name">${escapeHtml(db.name)}</div>
+										<div class="db-card__path">${escapeHtml(db.path)}</div>
+									</div>
+								</div>
+							</div>
+							<div class="db-card__badges mt-sm">
+								<nui-badge>${(db.docCount || 0).toLocaleString()} docs</nui-badge>
+								${trashBadge}
+							</div>
+							<div class="db-card__actions">
+								<nui-button data-action="browse-db" data-handle="${escapeHtml(db.handle)}" size="small">
+									<button type="button">Browse</button>
+								</nui-button>
+							</div>
+						</nui-card>
+					`;
+				}).join('');
+			}
+
+			if (unloadedDbs.length > 0) {
+				html += unloadedDbs.map(db => `
+					<nui-card class="db-card db-card--unloaded">
+						<div class="db-card__row">
+							<div class="db-card__info">
+								<span class="status-dot status-dot--unloaded" title="Not loaded">○</span>
+								<div>
+									<div class="db-card__name">${escapeHtml(db.name)}</div>
+									<div class="db-card__meta">${db.size ? formatBytes(db.size) : '—'} · ${db.modified ? new Date(db.modified).toLocaleDateString() : '—'}</div>
+								</div>
+							</div>
+						</div>
+						<div class="db-card__actions">
+							<nui-button data-action="load-db" data-path="${escapeHtml(db.path)}" size="small">
+								<button type="button">Load</button>
+							</nui-button>
+						</div>
+					</nui-card>
+				`).join('');
+			}
+
+			element.querySelector('#dbBreakdown').innerHTML = html;
+
+		} catch (err) {
+			element.querySelector('#dbBreakdown').innerHTML = `<p style="color: var(--nui-danger);">Failed to load databases: ${escapeHtml(err.message)}</p>`;
+		}
+	}
+
+	function formatDuration(seconds) {
+		const hours = Math.floor(seconds / 3600);
+		const mins = Math.floor((seconds % 3600) / 60);
+		const secs = Math.floor(seconds % 60);
+		if (hours > 0) return `${hours}h ${mins}m`;
+		if (mins > 0) return `${mins}m ${secs}s`;
+		return `${secs}s`;
+	}
+
+	function formatBytes(bytes) {
+		if (bytes === 0) return '0 B';
+		const units = ['B', 'KB', 'MB', 'GB'];
+		const i = Math.floor(Math.log(bytes) / Math.log(1024));
+		return (bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
+	}
+
+	function escapeHtml(str) {
+		if (str == null) return '';
+		return String(str).replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"');
+	}
+
+	// Handle navigation and actions
+	element.addEventListener('click', async (e) => {
+		const actionEl = e.target.closest('[data-action]');
+		if (!actionEl) return;
+
+		const action = actionEl.dataset.action;
+
+		if (action === 'navigate') {
+			const target = actionEl.dataset.target;
+			if (target) window.location.hash = target;
 		}
 
-		if (action === 'open-nvdb') {
-			const result = await nui.components.dialog.prompt('Open nVDB Database', 'Enter database path:', {
-				fields: [{ id: 'path', label: 'Path', value: 'myvdb' }]
-			});
-			if (result && result.path) {
-				try {
-					await api('/nvdb/instances', { method: 'POST', body: JSON.stringify({ path: result.path }) });
-					nui.components.banner.show({ content: 'Opened nVDB: ' + result.path, priority: 'success', autoClose: 3000 });
-					loadDashboard();
-				} catch (err) {
-					nui.components.banner.show({ content: 'Error: ' + err.message, priority: 'danger' });
-				}
+		if (action === 'browse-db') {
+			const handle = actionEl.dataset.handle;
+			if (handle) window.location.hash = `#feature=documents&handle=${handle}`;
+		}
+
+		if (action === 'load-db') {
+			const dbPath = actionEl.dataset.path;
+			if (!dbPath) return;
+			try {
+				const loadResult = await ndbApi.load(dbPath);
+				nui.components.banner.show({ content: `Loaded ${dbPath}`, priority: 'success', autoClose: 2000 });
+				await loadStatus();
+			} catch (err) {
+				nui.components.banner.show({ content: `Error: ${err.message}`, priority: 'danger' });
 			}
 		}
 	});
 
-	// Auto-refresh every 10s
-	refreshTimer = setInterval(loadDashboard, 10000);
+	// Load initial data
+	loadStatus();
 
-	// Lifecycle: pause polling when page is hidden
-	element.hide = () => {
-		if (refreshTimer) {
-			clearInterval(refreshTimer);
-			refreshTimer = null;
-		}
-	};
+	// Auto-refresh every 10 seconds (pause when hidden)
+	let intervalId = setInterval(loadStatus, 10000);
 
-	// Lifecycle: resume polling when page becomes visible
-	element.show = () => {
-		if (!refreshTimer) {
-			loadDashboard();
-			refreshTimer = setInterval(loadDashboard, 10000);
+	document.addEventListener('visibilitychange', () => {
+		if (document.hidden) {
+			clearInterval(intervalId);
+		} else {
+			loadStatus();
+			intervalId = setInterval(loadStatus, 10000);
 		}
+	});
+
+	// Cleanup on page change
+	return () => {
+		clearInterval(intervalId);
 	};
 }
 </script>

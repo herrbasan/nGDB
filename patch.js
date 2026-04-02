@@ -1,0 +1,12 @@
+const fs = require('fs');
+let c = fs.readFileSync('src/handlers/admin.js', 'utf8');
+const md = "function getDbMeta(dbDir) {\n  const metaPath = require('path').join(dbDir, 'meta.json');\n  if(fs.existsSync(metaPath)) { try { return JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch { return null; } }\n  return null;\n}\n";
+c = c.replace('function getTrashMeta(dbDir)', md + '\nfunction getTrashMeta(dbDir)');
+let idx1 = c.indexOf('const trash = getTrashMeta(dbDir);');
+c = c.slice(0, idx1) + 'const meta = getDbMeta(dbDir);\n\t\t\t\t' + c.slice(idx1);
+c = c.replace('trash,\n\t\t\t\t\t\t\t};', 'trash,\n\t\t\t\t\t\t\t\tmeta,\n\t\t\t\t\t\t\t};');
+c = c.replace('trash,\n\t\t\t\t\t\t};', 'trash,\n\t\t\t\t\t\t\tmeta,\n\t\t\t\t\t\t};');
+let lastIdx = c.lastIndexOf('const trash = getTrashMeta(dbDir);');
+c = c.slice(0, lastIdx) + 'const meta = getDbMeta(dbDir);\n\t\t\t\t\t\t\t\t' + c.slice(lastIdx);
+c = c.replace('trash,\n\t\t\t\t\t\t\t\t});', 'trash,\n\t\t\t\t\t\t\t\t\tmeta,\n\t\t\t\t\t\t\t\t});');
+fs.writeFileSync('src/handlers/admin.js', c);
