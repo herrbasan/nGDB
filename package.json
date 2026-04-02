@@ -15,5 +15,8 @@
   "license": "MIT OR Apache-2.0",
   "engines": {
     "node": ">= 18"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.6.0"
   }
 }
