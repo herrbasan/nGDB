@@ -40,6 +40,10 @@ function close(params, ctx) {
   for (const key of collectionCache.keys()) {
     if (key.startsWith(`${handle}::`)) collectionCache.delete(key);
   }
+  const entry = instances.get(handle);
+  if (entry && typeof entry.close === 'function') {
+    entry.close();
+  }
   instances.delete(handle);
   return { ok: true };
 }
@@ -105,10 +109,10 @@ function delete_(params, ctx) {
 
 // ─── Search ────────────────────────────────────────────────────────
 
-function search(params, ctx) {
+async function search(params, ctx) {
   const db = instances.get(params.handle);
-  const collection = getCollectionObj(params.handle, db, params.collection);
-  const raw = collection.search({
+  const collection = getCollectionObj(params.handle, db, params.collection);    
+  const raw = await collection.search({
     vector: params.vector,
     topK: params.topK,
     distance: params.distance,
@@ -136,17 +140,17 @@ function sync(params, ctx) {
   return { ok: true };
 }
 
-function compact(params, ctx) {
+async function compact(params, ctx) {
   const db = instances.get(params.handle);
-  const collection = getCollectionObj(params.handle, db, params.collection);
-  const r = collection.compact();
+  const collection = getCollectionObj(params.handle, db, params.collection);    
+  const r = await collection.compact();
   return { result: { docsBefore: r.docsBefore, docsAfter: r.docsAfter, segmentsMerged: r.segmentsMerged, indexRebuilt: r.indexRebuilt } };
 }
 
-function rebuildIndex(params, ctx) {
+async function rebuildIndex(params, ctx) {
   const db = instances.get(params.handle);
-  const collection = getCollectionObj(params.handle, db, params.collection);
-  collection.rebuildIndex();
+  const collection = getCollectionObj(params.handle, db, params.collection);    
+  await collection.rebuildIndex(params.options);
   return { ok: true };
 }
 

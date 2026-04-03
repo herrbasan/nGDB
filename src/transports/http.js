@@ -148,7 +148,7 @@ async function routeAdminApi(req, res, urlPath) {
   try {
     // ─── Status ──────────────────────────────────────────────────
     if (apiPath === '/status' && req.method === 'GET') {
-      json(res, 200, adminApiHandlers['GET /status']({}, { tenantId }));
+      json(res, 200, await adminApiHandlers['GET /status']({}, { tenantId }));
       return;
     }
 
@@ -156,27 +156,27 @@ async function routeAdminApi(req, res, urlPath) {
     
     // GET /ndb — list all databases (loaded + unloaded)
     if (apiPath === '/ndb' && req.method === 'GET') {
-      json(res, 200, adminApiHandlers['GET /ndb']({}, { tenantId }));
+      json(res, 200, await adminApiHandlers['GET /ndb']({}, { tenantId }));
       return;
     }
 
     // GET /ndb/available — list only unloaded databases
     if (apiPath === '/ndb/available' && req.method === 'GET') {
-      json(res, 200, adminApiHandlers['GET /ndb/available']({}, { tenantId }));
+      json(res, 200, await adminApiHandlers['GET /ndb/available']({}, { tenantId }));
       return;
     }
 
     // POST /ndb/open — open database by path (manual)
     if (apiPath === '/ndb/open' && req.method === 'POST') {
       const params = await parseBody(req);
-      json(res, 200, adminApiHandlers['POST /ndb/open'](params, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /ndb/open'](params, { tenantId }));
       return;
     }
 
     // POST /ndb/load — load a discovered database by path
     if (apiPath === '/ndb/load' && req.method === 'POST') {
       const params = await parseBody(req);
-      json(res, 200, adminApiHandlers['POST /ndb/load'](params, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /ndb/load'](params, { tenantId }));
       return;
     }
 
@@ -184,7 +184,7 @@ async function routeAdminApi(req, res, urlPath) {
     const ndbHandleMatch = apiPath.match(/^\/ndb\/([^/]+)$/);
     if (ndbHandleMatch && req.method === 'DELETE') {
       const handle = ndbHandleMatch[1];
-      json(res, 200, adminApiHandlers['DELETE /ndb/:handle']({ handle }, { tenantId }));
+      json(res, 200, await adminApiHandlers['DELETE /ndb/:handle']({ handle }, { tenantId }));
       return;
     }
 
@@ -192,7 +192,7 @@ async function routeAdminApi(req, res, urlPath) {
     const ndbUnloadMatch = apiPath.match(/^\/ndb\/([^/]+)\/unload$/);
     if (ndbUnloadMatch && req.method === 'POST') {
       const handle = ndbUnloadMatch[1];
-      json(res, 200, adminApiHandlers['POST /ndb/:handle/unload']({ handle }, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /ndb/:handle/unload']({ handle }, { tenantId }));
       return;
     }
 
@@ -205,12 +205,12 @@ async function routeAdminApi(req, res, urlPath) {
       if (req.method === 'GET') {
         const limit = url.searchParams.get('limit');
         const offset = url.searchParams.get('offset');
-        json(res, 200, adminApiHandlers['GET /ndb/:handle/docs']({ handle, limit, offset }, { tenantId }));
+        json(res, 200, await adminApiHandlers['GET /ndb/:handle/docs']({ handle, limit, offset }, { tenantId }));
         return;
       }
       if (req.method === 'POST') {
         const params = await parseBody(req);
-        json(res, 200, adminApiHandlers['POST /ndb/:handle/docs']({ handle, doc: params.doc }, { tenantId }));
+        json(res, 200, await adminApiHandlers['POST /ndb/:handle/docs']({ handle, doc: params.doc }, { tenantId }));
         return;
       }
     }
@@ -222,16 +222,16 @@ async function routeAdminApi(req, res, urlPath) {
       const id = ndbDocMatch[2];
       
       if (req.method === 'GET') {
-        json(res, 200, adminApiHandlers['GET /ndb/:handle/docs/:id']({ handle, id }, { tenantId }));
+        json(res, 200, await adminApiHandlers['GET /ndb/:handle/docs/:id']({ handle, id }, { tenantId }));
         return;
       }
       if (req.method === 'PUT') {
         const params = await parseBody(req);
-        json(res, 200, adminApiHandlers['PUT /ndb/:handle/docs/:id']({ handle, id, doc: params.doc }, { tenantId }));
+        json(res, 200, await adminApiHandlers['PUT /ndb/:handle/docs/:id']({ handle, id, doc: params.doc }, { tenantId }));
         return;
       }
       if (req.method === 'DELETE') {
-        json(res, 200, adminApiHandlers['DELETE /ndb/:handle/docs/:id']({ handle, id }, { tenantId }));
+        json(res, 200, await adminApiHandlers['DELETE /ndb/:handle/docs/:id']({ handle, id }, { tenantId }));
         return;
       }
     }
@@ -240,7 +240,7 @@ async function routeAdminApi(req, res, urlPath) {
     const ndbTrashMatch = apiPath.match(/^\/ndb\/([^/]+)\/trash$/);
     if (ndbTrashMatch && req.method === 'GET') {
       const handle = ndbTrashMatch[1];
-      json(res, 200, adminApiHandlers['GET /ndb/:handle/trash']({ handle }, { tenantId }));
+      json(res, 200, await adminApiHandlers['GET /ndb/:handle/trash']({ handle }, { tenantId }));
       return;
     }
 
@@ -249,7 +249,7 @@ async function routeAdminApi(req, res, urlPath) {
     if (ndbTrashRestoreMatch && req.method === 'POST') {
       const handle = ndbTrashRestoreMatch[1];
       const id = ndbTrashRestoreMatch[2];
-      json(res, 200, adminApiHandlers['POST /ndb/:handle/trash/:id/restore']({ handle, id }, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /ndb/:handle/trash/:id/restore']({ handle, id }, { tenantId }));
       return;
     }
 
@@ -258,7 +258,7 @@ async function routeAdminApi(req, res, urlPath) {
     if (ndbTrashDeleteMatch && req.method === 'DELETE') {
       const handle = ndbTrashDeleteMatch[1];
       const id = ndbTrashDeleteMatch[2];
-      json(res, 200, adminApiHandlers['DELETE /ndb/:handle/trash/:id']({ handle, id }, { tenantId }));
+      json(res, 200, await adminApiHandlers['DELETE /ndb/:handle/trash/:id']({ handle, id }, { tenantId }));
       return;
     }
 
@@ -266,7 +266,7 @@ async function routeAdminApi(req, res, urlPath) {
     const ndbTrashPurgeMatch = apiPath.match(/^\/ndb\/([^/]+)\/trash$/);
     if (ndbTrashPurgeMatch && req.method === 'DELETE') {
       const handle = ndbTrashPurgeMatch[1];
-      json(res, 200, adminApiHandlers['DELETE /ndb/:handle/trash']({ handle }, { tenantId }));
+      json(res, 200, await adminApiHandlers['DELETE /ndb/:handle/trash']({ handle }, { tenantId }));
       return;
     }
 
@@ -274,7 +274,7 @@ async function routeAdminApi(req, res, urlPath) {
     const ndbIndexesMatch = apiPath.match(/^\/ndb\/([^/]+)\/indexes$/);
     if (ndbIndexesMatch && req.method === 'GET') {
       const handle = ndbIndexesMatch[1];
-      json(res, 200, adminApiHandlers['GET /ndb/:handle/indexes']({ handle }, { tenantId }));
+      json(res, 200, await adminApiHandlers['GET /ndb/:handle/indexes']({ handle }, { tenantId }));
       return;
     }
 
@@ -282,7 +282,7 @@ async function routeAdminApi(req, res, urlPath) {
     const ndbBucketsMatch = apiPath.match(/^\/ndb\/([^/]+)\/buckets$/);
     if (ndbBucketsMatch && req.method === 'GET') {
       const handle = ndbBucketsMatch[1];
-      json(res, 200, adminApiHandlers['GET /ndb/:handle/buckets']({ handle }, { tenantId }));
+      json(res, 200, await adminApiHandlers['GET /ndb/:handle/buckets']({ handle }, { tenantId }));
       return;
     }
 
@@ -291,7 +291,7 @@ async function routeAdminApi(req, res, urlPath) {
     if (ndbBucketFilesMatch && req.method === 'GET') {
       const handle = ndbBucketFilesMatch[1];
       const bucket = ndbBucketFilesMatch[2];
-      json(res, 200, adminApiHandlers['GET /ndb/:handle/buckets/:bucket/files']({ handle, bucket }, { tenantId }));
+      json(res, 200, await adminApiHandlers['GET /ndb/:handle/buckets/:bucket/files']({ handle, bucket }, { tenantId }));
       return;
     }
 
@@ -301,7 +301,7 @@ async function routeAdminApi(req, res, urlPath) {
       const handle = ndbBucketStoreMatch[1];
       const bucket = ndbBucketStoreMatch[2];
       const params = await parseBody(req);
-      json(res, 200, adminApiHandlers['POST /ndb/:handle/buckets/:bucket']({ handle, bucket, ...params }, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /ndb/:handle/buckets/:bucket']({ handle, bucket, ...params }, { tenantId }));
       return;
     }
 
@@ -310,7 +310,7 @@ async function routeAdminApi(req, res, urlPath) {
     if (ndbBucketTrashMatch && req.method === 'GET') {
       const handle = ndbBucketTrashMatch[1];
       const bucket = ndbBucketTrashMatch[2];
-      json(res, 200, adminApiHandlers['GET /ndb/:handle/buckets/:bucket/trash']({ handle, bucket }, { tenantId }));
+      json(res, 200, await adminApiHandlers['GET /ndb/:handle/buckets/:bucket/trash']({ handle, bucket }, { tenantId }));
       return;
     }
 
@@ -321,7 +321,7 @@ async function routeAdminApi(req, res, urlPath) {
       const bucket = ndbBucketTrashRestoreMatch[2];
       const hash = ndbBucketTrashRestoreMatch[3];
       const ext = ndbBucketTrashRestoreMatch[4];
-      json(res, 200, adminApiHandlers['POST /ndb/:handle/buckets/:bucket/trash/:hash/:ext/restore']({ handle, bucket, hash, ext }, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /ndb/:handle/buckets/:bucket/trash/:hash/:ext/restore']({ handle, bucket, hash, ext }, { tenantId }));
       return;
     }
 
@@ -332,7 +332,7 @@ async function routeAdminApi(req, res, urlPath) {
       const bucket = ndbBucketTrashDeleteMatch[2];
       const hash = ndbBucketTrashDeleteMatch[3];
       const ext = ndbBucketTrashDeleteMatch[4];
-      json(res, 200, adminApiHandlers['DELETE /ndb/:handle/buckets/:bucket/trash/:hash/:ext']({ handle, bucket, hash, ext }, { tenantId }));
+      json(res, 200, await adminApiHandlers['DELETE /ndb/:handle/buckets/:bucket/trash/:hash/:ext']({ handle, bucket, hash, ext }, { tenantId }));
       return;
     }
 
@@ -341,7 +341,7 @@ async function routeAdminApi(req, res, urlPath) {
     if (ndbBucketTrashPurgeMatch && req.method === 'DELETE') {
       const handle = ndbBucketTrashPurgeMatch[1];
       const bucket = ndbBucketTrashPurgeMatch[2];
-      json(res, 200, adminApiHandlers['DELETE /ndb/:handle/buckets/:bucket/trash']({ handle, bucket }, { tenantId }));
+      json(res, 200, await adminApiHandlers['DELETE /ndb/:handle/buckets/:bucket/trash']({ handle, bucket }, { tenantId }));
       return;
     }
 
@@ -352,7 +352,7 @@ async function routeAdminApi(req, res, urlPath) {
       const bucket = ndbFileDeleteMatch[2];
       const hash = ndbFileDeleteMatch[3];
       const ext = ndbFileDeleteMatch[4];
-      json(res, 200, adminApiHandlers['DELETE /ndb/:handle/buckets/:bucket/:hash']({ handle, bucket, hash, ext }, { tenantId }));
+      json(res, 200, await adminApiHandlers['DELETE /ndb/:handle/buckets/:bucket/:hash']({ handle, bucket, hash, ext }, { tenantId }));
       return;
     }
 
@@ -360,7 +360,7 @@ async function routeAdminApi(req, res, urlPath) {
     const ndbFlushMatch = apiPath.match(/^\/ndb\/([^/]+)\/flush$/);
     if (ndbFlushMatch && req.method === 'POST') {
       const handle = ndbFlushMatch[1];
-      json(res, 200, adminApiHandlers['POST /ndb/:handle/flush']({ handle }, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /ndb/:handle/flush']({ handle }, { tenantId }));
       return;
     }
 
@@ -368,7 +368,7 @@ async function routeAdminApi(req, res, urlPath) {
     const ndbCompactMatch = apiPath.match(/^\/ndb\/([^/]+)\/compact$/);
     if (ndbCompactMatch && req.method === 'POST') {
       const handle = ndbCompactMatch[1];
-      json(res, 200, adminApiHandlers['POST /ndb/:handle/compact']({ handle }, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /ndb/:handle/compact']({ handle }, { tenantId }));
       return;
     }
 
@@ -377,7 +377,7 @@ async function routeAdminApi(req, res, urlPath) {
     if (ndbQueryMatch && req.method === 'POST') {
       const handle = ndbQueryMatch[1];
       const params = await parseBody(req);
-      json(res, 200, adminApiHandlers['POST /ndb/:handle/query']({ handle, ast: params.ast, options: params.options }, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /ndb/:handle/query']({ handle, ast: params.ast, options: params.options }, { tenantId }));
       return;
     }
 
@@ -385,14 +385,14 @@ async function routeAdminApi(req, res, urlPath) {
 
     // GET /nvdb — list instances
     if (apiPath === '/nvdb' && req.method === 'GET') {
-      json(res, 200, adminApiHandlers['GET /nvdb']({}, { tenantId }));
+      json(res, 200, await adminApiHandlers['GET /nvdb']({}, { tenantId }));
       return;
     }
 
     // POST /nvdb/open — open vector database
     if (apiPath === '/nvdb/open' && req.method === 'POST') {
       const params = await parseBody(req);
-      json(res, 200, adminApiHandlers['POST /nvdb/open'](params, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /nvdb/open'](params, { tenantId }));
       return;
     }
 
@@ -400,7 +400,7 @@ async function routeAdminApi(req, res, urlPath) {
     const nvdbHandleMatch = apiPath.match(/^\/nvdb\/([^/]+)$/);
     if (nvdbHandleMatch && req.method === 'DELETE') {
       const handle = nvdbHandleMatch[1];
-      json(res, 200, adminApiHandlers['DELETE /nvdb/:handle']({ handle }, { tenantId }));
+      json(res, 200, await adminApiHandlers['DELETE /nvdb/:handle']({ handle }, { tenantId }));
       return;
     }
 
@@ -410,12 +410,12 @@ async function routeAdminApi(req, res, urlPath) {
       const handle = nvdbCollectionsMatch[1];
       
       if (req.method === 'GET') {
-        json(res, 200, adminApiHandlers['GET /nvdb/:handle/collections']({ handle }, { tenantId }));
+        json(res, 200, await adminApiHandlers['GET /nvdb/:handle/collections']({ handle }, { tenantId }));
         return;
       }
       if (req.method === 'POST') {
         const params = await parseBody(req);
-        json(res, 200, adminApiHandlers['POST /nvdb/:handle/collections']({ handle, ...params }, { tenantId }));
+        json(res, 200, await adminApiHandlers['POST /nvdb/:handle/collections']({ handle, ...params }, { tenantId }));
         return;
       }
     }
@@ -425,7 +425,7 @@ async function routeAdminApi(req, res, urlPath) {
     if (nvdbCollectionMatch && req.method === 'GET') {
       const handle = nvdbCollectionMatch[1];
       const name = nvdbCollectionMatch[2];
-      json(res, 200, adminApiHandlers['GET /nvdb/:handle/collections/:name']({ handle, name }, { tenantId }));
+      json(res, 200, await adminApiHandlers['GET /nvdb/:handle/collections/:name']({ handle, name }, { tenantId }));
       return;
     }
 
@@ -435,7 +435,7 @@ async function routeAdminApi(req, res, urlPath) {
       const handle = nvdbSearchMatch[1];
       const name = nvdbSearchMatch[2];
       const params = await parseBody(req);
-      json(res, 200, adminApiHandlers['POST /nvdb/:handle/collections/:name/search']({ handle, name, ...params }, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /nvdb/:handle/collections/:name/search']({ handle, name, ...params }, { tenantId }));
       return;
     }
 
@@ -444,7 +444,7 @@ async function routeAdminApi(req, res, urlPath) {
     if (nvdbFlushMatch && req.method === 'POST') {
       const handle = nvdbFlushMatch[1];
       const name = nvdbFlushMatch[2];
-      json(res, 200, adminApiHandlers['POST /nvdb/:handle/collections/:name/flush']({ handle, name }, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /nvdb/:handle/collections/:name/flush']({ handle, name }, { tenantId }));
       return;
     }
 
@@ -453,7 +453,7 @@ async function routeAdminApi(req, res, urlPath) {
     if (nvdbCompactMatch && req.method === 'POST') {
       const handle = nvdbCompactMatch[1];
       const name = nvdbCompactMatch[2];
-      json(res, 200, adminApiHandlers['POST /nvdb/:handle/collections/:name/compact']({ handle, name }, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /nvdb/:handle/collections/:name/compact']({ handle, name }, { tenantId }));
       return;
     }
 
@@ -461,14 +461,14 @@ async function routeAdminApi(req, res, urlPath) {
     
     // Old: GET /ndb/instances -> redirect to new
     if (apiPath === '/ndb/instances' && req.method === 'GET') {
-      json(res, 200, adminApiHandlers['GET /ndb']({}, { tenantId }));
+      json(res, 200, await adminApiHandlers['GET /ndb']({}, { tenantId }));
       return;
     }
 
     // Old: POST /ndb/instances -> open database
     if (apiPath === '/ndb/instances' && req.method === 'POST') {
       const params = await parseBody(req);
-      json(res, 200, adminApiHandlers['POST /ndb/open'](params, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /ndb/open'](params, { tenantId }));
       return;
     }
 
@@ -476,20 +476,20 @@ async function routeAdminApi(req, res, urlPath) {
     const oldNdbInstanceMatch = apiPath.match(/^\/ndb\/instances\/([^/]+)$/);
     if (oldNdbInstanceMatch && req.method === 'DELETE') {
       const handle = oldNdbInstanceMatch[1];
-      json(res, 200, adminApiHandlers['DELETE /ndb/:handle']({ handle }, { tenantId }));
+      json(res, 200, await adminApiHandlers['DELETE /ndb/:handle']({ handle }, { tenantId }));
       return;
     }
 
     // Old: GET /nvdb/instances
     if (apiPath === '/nvdb/instances' && req.method === 'GET') {
-      json(res, 200, adminApiHandlers['GET /nvdb']({}, { tenantId }));
+      json(res, 200, await adminApiHandlers['GET /nvdb']({}, { tenantId }));
       return;
     }
 
     // Old: POST /nvdb/instances
     if (apiPath === '/nvdb/instances' && req.method === 'POST') {
       const params = await parseBody(req);
-      json(res, 200, adminApiHandlers['POST /nvdb/open'](params, { tenantId }));
+      json(res, 200, await adminApiHandlers['POST /nvdb/open'](params, { tenantId }));
       return;
     }
 
@@ -497,7 +497,7 @@ async function routeAdminApi(req, res, urlPath) {
     const oldNvdbInstanceMatch = apiPath.match(/^\/nvdb\/instances\/([^/]+)$/);
     if (oldNvdbInstanceMatch && req.method === 'DELETE') {
       const handle = oldNvdbInstanceMatch[1];
-      json(res, 200, adminApiHandlers['DELETE /nvdb/:handle']({ handle }, { tenantId }));
+      json(res, 200, await adminApiHandlers['DELETE /nvdb/:handle']({ handle }, { tenantId }));
       return;
     }
 
@@ -551,7 +551,7 @@ async function route(req, res) {
       return;
     }
     const params = await parseBody(req);
-    const result = handler(params, { tenantId });
+    const result = await handler(params, { tenantId });
     json(res, 200, result);
     return;
   }
@@ -566,7 +566,7 @@ async function route(req, res) {
       return;
     }
     const params = await parseBody(req);
-    const result = handler(params, { tenantId });
+    const result = await handler(params, { tenantId });
     json(res, 200, result);
     return;
   }
@@ -581,7 +581,7 @@ async function route(req, res) {
       return;
     }
     const params = await parseBody(req);
-    const result = handler(params, { tenantId });
+    const result = await handler(params, { tenantId });
     json(res, 200, result);
     return;
   }

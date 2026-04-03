@@ -40,11 +40,11 @@
 
 ---
 
-## Phase 1.5: N-API Pipeline Hardening
+## Phase 1.5: N-API Pipeline Hardening ✅
 **Goal:** Guarantee strict memory/lock lifecycle and non-blocking event-loop integration for heavy functions.
 
-- [ ] **Deterministic Lock Releases:** Implement `.close()` on both `nDB` and `nVDB` bindings to manually drop `Arc` references and release OS `.lock` files instantly.
-- [ ] **Async Background Threading:** Implement the `napi::Task` trait for heavy operations (`compact`, `search`, `rebuild_index`, `export`, `query`), exposing them as non-blocking `Promise`s to Node.js.
+- [x] **Deterministic Lock Releases:** Implement `.close()` on both `nDB` and `nVDB` bindings to manually drop `Arc` references and release OS `.lock` files instantly.
+- [x] **Async Background Threading:** Implement the `napi::Task` trait for heavy operations (`compact`, `search`, `rebuild_index`, `export`, `query`), exposing them as non-blocking `Promise`s to Node.js.
 
 ---
 
@@ -157,10 +157,10 @@
 
 ---
 
-## Phase 6: Ecosystem
+## Phase 6: Ecosystem ✅
 **Goal:** Client SDKs and tooling
 
-- [ ] **JavaScript client SDK**
+- [x] **JavaScript client SDK**
   - Vanilla JS client library (no TypeScript)
   - HTTP client with handle management
   - WebSocket client with subscription helpers

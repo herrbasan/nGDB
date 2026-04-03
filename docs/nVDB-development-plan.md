@@ -41,17 +41,17 @@
 
 **Reference:** [CLI & Snapshot Specification](./cli-spec.md)
 
-- [ ] **CLI Infrastructure**
+- [x] **CLI Infrastructure**
   - **No dependencies:** Do NOT use `clap`. We stick to the maxims. The CLI must be fully parsed natively using `std::env::args()`. Simple > Abstraction.
   - Create `src/bin/nvdb.rs` as a standalone executable. Do not share a workspace or create a common CLI crate with nDB. LLMs read standalone files best.
-- [ ] **Database Inspection (`nvdb info`)**
+- [x] **Database Inspection (`nvdb info`)**
   - Read `meta.json`.
   - Compile vectors counts internally vs Segment size logic.
   - Extrapolate WAL usage statistics.
-- [ ] **Offline Compaction (`nvdb compact`)**
+- [x] **Offline Compaction (`nvdb compact`)**
   - CLI command to trigger an in-place snapshot/merge of segments.
   - Allows manual HNSW topology rebuilding out-of-band.
-- [ ] **Snapshot System (`nvdb export` / `ndb import`)**
+- [x] **Snapshot System (`nvdb export` / `ndb import`)**
   - Core API `export_snapshot(target_dir)` inside `Collection`: Performs a compaction merge, but writes the output strictly into `<target_dir>`, placing an `index.hnsw` and `snapshot.json` metadata flag alongside the un-fragmented active dataset. No WAL log file included by design.
   - CLI command `nvdb export <db-path> <export-dir>` passing target constraints.
   - CLI command `nvdb import <snapshot-dir> <target-db-path>` validating snapshot format and executing a clean file-copy of the elements towards runtime.

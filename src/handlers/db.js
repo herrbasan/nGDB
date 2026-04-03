@@ -137,6 +137,9 @@ function close(params, ctx) {
   const entry = instances.get(handle);
   if (!entry) throw new Error(`nDB instance not found: ${handle}`);
   entry.db.flush();
+  if (typeof entry.db.close === 'function') {
+    entry.db.close();
+  }
   instances.delete(handle);
   return { ok: true };
 }
@@ -169,17 +172,17 @@ function delete_(params, ctx) {
   return { ok: true };
 }
 
-function query(params, ctx) {
+async function query(params, ctx) {
   const entry = instances.get(params.handle);
-  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
-  const results = entry.db.query(params.ast);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);      
+  const results = await entry.db.query(params.ast);
   return { results };
 }
 
-function queryWith(params, ctx) {
+async function queryWith(params, ctx) {
   const entry = instances.get(params.handle);
-  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
-  const results = entry.db.queryWith(params.ast, params.options);
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);      
+  const results = await entry.db.queryWith(params.ast, params.options);
   return { results };
 }
 
@@ -274,10 +277,10 @@ function hasIndex(params, ctx) {
   return { exists };
 }
 
-function compact(params, ctx) {
+async function compact(params, ctx) {
   const entry = instances.get(params.handle);
-  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);
-  entry.db.compact();
+  if (!entry) throw new Error(`nDB instance not found: ${params.handle}`);      
+  await entry.db.compact();
   return { ok: true };
 }
 

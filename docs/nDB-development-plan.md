@@ -45,16 +45,16 @@ These decisions were resolved before implementation begins. See [nDB-spec §Reso
 
 **Reference:** [CLI & Snapshot Specification](./cli-spec.md)
 
-- [ ] **CLI Infrastructure**
+- [x] **CLI Infrastructure**
   - **No dependencies:** Do NOT use `clap`. We stick to the maxims. The CLI must be fully parsed natively using `std::env::args()`. Simple > Abstraction.
   - Create `src/bin/ndb.rs` as the database management executable. We actively reject building a `shared-cli-crate`, since having self-contained, independent scripts maps much better to an LLM context window than deeply nested DRY abstractions.
-- [ ] **Database Inspection (`ndb info`)**
+- [x] **Database Inspection (`ndb info`)**
   - Read `meta.json`.
   - Calculate document counts, active size vs. trash size, and fragmentation ratio.
   - Output human-readable statistics to terminal.
-- [ ] **Offline Compaction (`ndb compact`)**
+- [x] **Offline Compaction (`ndb compact`)**
   - CLI command to trigger an in-place compaction out-of-band from the Node process.
-- [ ] **Snapshot System (`ndb export` / `ndb import`)**
+- [x] **Snapshot System (`ndb export` / `ndb import`)**
   - Core API `export_snapshot(target_dir)`: streams active data directly into a pristine, zero-trash directory with `snapshot.json`.
   - CLI command `ndb export <db-path> <export-dir>` wrapping the API.
   - CLI command `ndb import <snapshot-dir> <dest-path>` for validating a snapshot and positioning it for the application.
