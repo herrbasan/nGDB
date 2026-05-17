@@ -1,5 +1,11 @@
 # nGDB
 
+> **⚠️ ARCHIVED — For Reference Only**
+> 
+> This project has been **abandoned**. The nGDB management wrapper concept was folded directly into the native Rust cores of [nDB](https://github.com/herrbasan/nDB) and [nVDB](https://github.com/herrbasan/nVDB). See [database_evolution_plan.md](ndb/database_evolution_plan.md) in the nDB submodule for details on the pivot.
+>
+> This repo is kept for historical reference only. The submodules (`ndb/`, `nvdb/`, `admin/nui_wc2/`) are the active projects.
+
 > n000b General Database Platform — A service wrapper that runs nDB and nVDB as network services, exposing their full native APIs over HTTP and WebSocket.
 
 ## Vision
